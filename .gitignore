@@ -1,0 +1,11 @@
+fl/
+leaf/
+data/
+results/
+images/
+images-old/
+archive/
+.DS_Store
+__pycache__/
+*.egg-info
+*.zip

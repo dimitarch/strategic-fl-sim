@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "strategicfl"
+version = "0.1.0"
+description = "Strategic Federated Learning Framework"
+requires-python = ">=3.8"
+dependencies = [
+    "torch",
+    "numpy",
+    "omegaconf",
+    "tqdm",
+    "transformers",
+]
+
+[tool.setuptools.packages.find]

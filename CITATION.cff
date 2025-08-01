@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "StrategicFL"
+abstract: "A Python framework for simulating strategic federated learning scenarios where clients can behave adversarially by manipulating gradient updates. Supports multiple datasets (FEMNIST, Shakespeare, Twitter) and various robust aggregation methods."
+authors:
+  - family-names: "Chakarov"
+    given-names: "Dimitar"
+repository-code: "https://github.com/dimitarch/strategicfl"
+keywords:
+  - "algorithmic game theory"
+  - "algorithmic mechanism design"
+  - "federated learning"
+  - "incentive design"
+license: "Apache-2.0"
+version: "0.1.0"
+
+preferred-citation:
+  type: misc
+  title: "Towards Incentivizing Truthful Collaboration in Heterogeneous Federated Learning"
+  authors:
+    - family-names: "Chakarov"
+      given-names: "Dimitar"
+    - family-names: "Tsoy"
+      given-names: "Nikita"
+    - family-names: "Minchev"
+      given-names: "Kristian"
+    - family-names: "Konstantinov"
+      given-names: "Nikola"
+  url: "https://arxiv.org/abs/2412.00980"
