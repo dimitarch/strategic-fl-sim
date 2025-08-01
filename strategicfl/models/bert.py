@@ -9,12 +9,9 @@ class BertWithClassifier(nn.Module):
         self.bert.classifier = nn.Sequential(nn.Linear(768, 384), nn.Linear(384, 2))
 
     def forward(self, input_ids, attention_mask=None, **kwargs):
-        # Handle the case where input_ids is the only input (for compatibility)
         if attention_mask is None and input_ids.dim() == 2:
-            # Create attention mask (1 for real tokens, 0 for padding)
             attention_mask = (input_ids != 0).long()
 
-        # Get outputs from BERT
         outputs = self.bert(
             input_ids=input_ids, attention_mask=attention_mask, **kwargs
         )

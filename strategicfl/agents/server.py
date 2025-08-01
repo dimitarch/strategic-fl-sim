@@ -13,7 +13,7 @@ class Server(Agent):
         criterion: nn.Module,
         optimizer: torch.optim.Optimizer,
         aggregate_fn: Callable,
-        agent_id: str = "server",  # Default server ID
+        agent_id: str = "server",
     ):
         super().__init__(device, model, criterion, optimizer, agent_id)
         self.aggregate_fn = aggregate_fn

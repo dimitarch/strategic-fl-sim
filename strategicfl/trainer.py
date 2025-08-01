@@ -11,7 +11,11 @@ from .agents import Client, Server
 def compute_client_gradient(
     server: Server, client: Client, K: int
 ) -> Tuple[float, List[torch.Tensor], List[torch.Tensor]]:
-    inputs, labels = next(client.train_iterator)
+    try:
+        inputs, labels = next(client.train_iterator)
+    except StopIteration:
+        client.train_iterator = iter(client.train_dataloader)
+        inputs, labels = next(client.train_iterator)
 
     if K > 1:
         client.model.load_state_dict(server.state_dict())
@@ -55,9 +59,7 @@ def train(
 
         # Compute gradients for all agents
         for client in clients:
-            loss, grad, sent = compute_client_gradient(
-                server, client, K
-            )
+            loss, grad, sent = compute_client_gradient(server, client, K)
 
             grads_sent.append(sent)
             grads_real.append(grad)

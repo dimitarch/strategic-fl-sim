@@ -16,7 +16,7 @@ class Client(Agent):
         criterion: nn.Module,
         optimizer: torch.optim.Optimizer,
         action: Callable,
-        agent_id: str = "client",  # Default client ID
+        agent_id: str = "client",
     ):
         super().__init__(device, model, criterion, optimizer, agent_id)
         self.train_dataloader = train_dataloader
