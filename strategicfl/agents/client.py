@@ -27,14 +27,6 @@ class Client(Agent):
     def apply_action(self, gradient):
         return self.action(gradient)
 
-    def get_next_train_batch(self):
-        """Get next training batch."""
-        try:
-            return next(self.train_iterator)
-        except StopIteration:
-            self.train_iterator = iter(self.train_dataloader)
-            return next(self.train_iterator)
-
     def evaluate_on_test_set(self):
         """Evaluate model on entire test set using batched processing."""
         was_training = self.model.training

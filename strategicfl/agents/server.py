@@ -1,8 +1,9 @@
 from typing import Callable
 
 import torch
-from .agent import Agent
 from torch import nn
+
+from .agent import Agent
 
 
 class Server(Agent):
@@ -30,7 +31,6 @@ class Server(Agent):
         """
         self.optimizer.zero_grad()
 
-        # Update server model with aggregate gradient
         for param, grad in zip(self.trainable_params, aggregated_gradient):
             param.grad = grad
 

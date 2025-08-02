@@ -16,29 +16,9 @@ from strategicfl.aggregation import get_aggregate
 from strategicfl.models import CNN
 from utils.config import load_config, save_config
 from utils.device import get_device
+from utils.evaluate import evaluate_with_ids
 from utils.io import generate_save_name, make_dir
 from utils.metrics import get_gradient_metrics
-
-
-def evaluate_with_ids(server, clients):
-    """Evaluate clients and return results keyed by agent ID."""
-    print("Starting evaluation...")
-    accuracy_all = {}
-    loss_all = {}
-
-    # Update all client models with server weights
-    for client in clients:
-        client.model.load_state_dict(server.model.state_dict())
-
-    # Evaluate each client, using ID as key
-    for client in clients:
-        accuracy, loss = client.evaluate_on_test_set()
-        accuracy_all[client.agent_id] = accuracy
-        loss_all[client.agent_id] = loss
-
-        print(f"{client.agent_id}: Accuracy = {accuracy:.4f}, Loss = {loss:.4f}")
-
-    return accuracy_all, loss_all
 
 
 def get_data(path: str):
