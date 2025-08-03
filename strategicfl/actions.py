@@ -14,3 +14,17 @@ def create_scalar_action(alpha, beta):
         return alpha * gradient + noise
 
     return action
+
+
+def create_byzantine_action(strength: float = 10.0):
+    def action(gradient):
+        return -strength * gradient
+
+    return action
+
+
+def create_freeriding_action():
+    def action(gradient):
+        return torch.zeros_like(gradient)
+
+    return action
