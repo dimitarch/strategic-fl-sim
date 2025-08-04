@@ -16,7 +16,6 @@ def evaluate_with_ids(server: Server, clients: List[Client]) -> tuple[dict, dict
             - accuracy_all (dict): Dictionary mapping client IDs to their accuracy scores
             - loss_all (dict): Dictionary mapping client IDs to their loss values
     """
-    print("Starting evaluation...")
     accuracy_all = {}
     loss_all = {}
 

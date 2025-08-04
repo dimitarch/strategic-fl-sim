@@ -42,6 +42,7 @@ if __name__ == "__main__":
 
     # Load configuration
     config = load_config(args.config)
+    config.training.T = 2000
 
     # Make sure that the destination folders for results exist
     make_dir("./results")
@@ -64,14 +65,14 @@ if __name__ == "__main__":
 
     # Create the server agent
     print("Creating server agent...")
-    server_model = CNN()
+    server_model = CNN().to(device)
+    print("Compiling server model...")
+    # server_model = torch.compile(server_model) # maybe not on apple silicon :(
     server = Server(
         device=device,
         model=server_model,
-        criterion=nn.CrossEntropyLoss(),
-        optimizer=torch.optim.SGD(
-            server_model.parameters(), lr=config.training.lr, foreach=True
-        ),
+        criterion=nn.CrossEntropyLoss().to(device),
+        optimizer=torch.optim.SGD(server_model.parameters(), lr=config.training.lr),
         aggregate_fn=get_aggregate(method=config.aggregation.method),
     )
     print(f"Created {server}")
@@ -113,15 +114,14 @@ if __name__ == "__main__":
 
         # Create client
         client_model = CNN().to(device)  # Create local model
+        # client_model = torch.compile(client_model)
         client = Client(
             device=device,
             train_dataloader=train_dataloader,
             test_dataloader=test_dataloader,
             model=client_model,
-            criterion=nn.CrossEntropyLoss(),
-            optimizer=torch.optim.SGD(
-                client_model.parameters(), lr=config.training.lr, foreach=True
-            ),
+            criterion=nn.CrossEntropyLoss().to(device),
+            optimizer=torch.optim.SGD(client_model.parameters(), lr=config.training.lr),
             action=create_scalar_action(alpha, beta),
             agent_id="bad" if i == config.clients.n_players - 1 else f"good{i}",
         )

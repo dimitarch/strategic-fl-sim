@@ -13,7 +13,6 @@ from strategicfl.actions import create_scalar_action
 from strategicfl.agents import Client, Server
 from strategicfl.aggregation import get_aggregate
 from strategicfl.models import LSTM
-from strategicfl.trainer import train
 from utils.config import load_config, save_config
 from utils.device import get_device
 from utils.evaluate import evaluate_with_ids
@@ -40,7 +39,7 @@ if __name__ == "__main__":
 
     # Load configuration
     config = load_config(args.config)
-    config.training.T = 50
+    config.training.T = 3500
 
     # Make sure that the destination folders for results exist
     make_dir("./results")
@@ -103,11 +102,13 @@ if __name__ == "__main__":
         num_classes=config.model.num_classes,
         n_hidden=config.model.n_hidden,
         embedding_dim=config.model.embedding_dim,
-    )
+    ).to(device)
+    print("Compiling server model...")
+    # server_model = torch.compile(server_model)
     server = Server(
         device=device,
         model=server_model,
-        criterion=nn.CrossEntropyLoss(),
+        criterion=nn.CrossEntropyLoss().to(device),
         optimizer=torch.optim.SGD(
             server_model.parameters(), lr=config.training.lr, foreach=True
         ),
@@ -163,7 +164,7 @@ if __name__ == "__main__":
             n_hidden=config.model.n_hidden,
             embedding_dim=config.model.embedding_dim,
         ).to(device)
-
+        # client_model = torch.compile(client_model)
         client = Client(
             device=device,
             train_dataloader=train_dataloader,  # Use standard DataLoader
@@ -182,11 +183,11 @@ if __name__ == "__main__":
 
     # Train
     print("Starting training...")
-    all_losses, all_metrics = train(
-        server=server,
+    all_losses, all_metrics = server.train(
+        # server=server,
         clients=clients,
         T=config.training.T,
-        K=config.training.local_steps,
+        # K=config.training.local_steps,
         get_metrics=get_gradient_metrics,
     )
     print("Training finished!")

@@ -25,7 +25,7 @@ def compute_client_gradient(
 
         grad = []
         for local_param, server_param in zip(
-            client.model.parameters(), server.parameters()
+            client.model.parameters(), server.trainable_params
         ):
             grad.append((server_param - local_param).detach().clone())
     else:  # Single step case
@@ -39,7 +39,7 @@ def compute_client_gradient(
     sent_grad = [client.apply_action(g) for g in grad]
     loss_value = loss.detach().cpu().item()
 
-    return loss_value, grad, sent_grad
+    return loss_value, sent_grad
 
 
 def train(
@@ -54,24 +54,23 @@ def train(
 
     for _ in tqdm(range(T), total=T, desc="Training"):
         grads_sent = []
-        grads_real = []
         losses = []
 
         # Compute gradients for all agents
         for client in clients:
-            loss, grad, sent = compute_client_gradient(server, client, K)
+            loss, sent = compute_client_gradient(server, client, K)
 
             grads_sent.append(sent)
-            grads_real.append(grad)
             losses.append(loss)
 
         losses_global.append(losses)
-        aggregate_gradient = server.aggregate_fn(grads_sent)
-        server.update_model_with_gradient(aggregate_gradient)
+
+        aggregated_gradient = server.aggregate(grads_sent)
+        server.update(grads_sent)
 
         # If there are any metrics to be recorded
         if get_metrics is not None:
-            metrics_global.append(get_metrics(grads_sent, aggregate_gradient))
+            metrics_global.append(get_metrics(grads_sent, aggregated_gradient))
 
     torch.cuda.empty_cache()
 

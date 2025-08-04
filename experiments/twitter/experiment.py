@@ -25,10 +25,8 @@ def freeze_bert_encoder(model):
     for name, param in model.named_parameters():
         if "classifier" in name:
             param.requires_grad = True
-            print(f"Trainable: {name}")
         else:
             param.requires_grad = False
-            print(f"Frozen: {name}")
 
 
 def get_data(path: str):
@@ -94,7 +92,7 @@ if __name__ == "__main__":
 
     # Create a server agent with BERT model
     print("Creating server agent...")
-    server_model = BertWithClassifier()
+    server_model = BertWithClassifier().to(device)
 
     # Freeze BERT encoder, keep only classifier trainable
     freeze_bert_encoder(server_model)
