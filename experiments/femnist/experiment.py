@@ -9,16 +9,15 @@ from omegaconf import OmegaConf
 from torch import nn
 from torch.utils.data import DataLoader
 
-from strategicfl import trainer
-from strategicfl.actions import create_scalar_action
+from models import CNN
 from strategicfl.agents import Client, Server
-from strategicfl.aggregation import get_aggregate
-from strategicfl.models import CNN
+from strategicfl.training.evaluate import evaluate_with_ids
+from strategicfl.training.metrics import get_gradient_metrics
+from strategicfl.utils.actions import create_scalar_action
+from strategicfl.utils.aggregation import get_aggregate
 from utils.config import load_config, save_config
 from utils.device import get_device
-from utils.evaluate import evaluate_with_ids
 from utils.io import generate_save_name, make_dir
-from utils.metrics import get_gradient_metrics
 
 
 def get_data(path: str):
@@ -43,12 +42,14 @@ if __name__ == "__main__":
     # Load configuration
     config = load_config(args.config)
     config.training.T = 2000
+    config.clients.n_players = 5
 
     # Make sure that the destination folders for results exist
     make_dir("./results")
     make_dir(config.experiment.save_dir)
 
-    print("Finished loading all data!")
+    torch.backends.cudnn.benchmark = True  # cuDNN optimization
+
     print("Using configuration:")
     print(OmegaConf.to_yaml(config, resolve=True))
 
@@ -67,7 +68,12 @@ if __name__ == "__main__":
     print("Creating server agent...")
     server_model = CNN().to(device)
     print("Compiling server model...")
-    # server_model = torch.compile(server_model) # maybe not on apple silicon :(
+
+    if device.type == "cuda":
+        server_model = torch.compile(
+            server_model, mode="reduce-overhead"
+        )  # maybe not on apple silicon :(
+
     server = Server(
         device=device,
         model=server_model,
@@ -103,18 +109,26 @@ if __name__ == "__main__":
             train_dataset,
             batch_size=config.training.get("batch_size", 32),
             shuffle=True,
+            # num_workers=2,
+            pin_memory=True if device.type == "cuda" else False,
+            # persistent_workers=True,
         )
 
         test_dataloader = DataLoader(
             test_dataset,
             batch_size=config.training.get("eval_batch_size", 128),
             shuffle=False,
+            # num_workers=2,
             pin_memory=True if device.type == "cuda" else False,
+            # persistent_workers=True,
         )
 
         # Create client
         client_model = CNN().to(device)  # Create local model
-        # client_model = torch.compile(client_model)
+
+        if device.type == "cuda":
+            client_model = torch.compile(client_model, mode="reduce-overhead")
+
         client = Client(
             device=device,
             train_dataloader=train_dataloader,
@@ -127,14 +141,15 @@ if __name__ == "__main__":
         )
 
         clients.append(client)
+        print(f"Created {client}")
 
     # Train
     print("Starting training...")
-    all_losses, all_metrics = trainer.train(
-        server=server,
+    all_losses, all_metrics = server.train(
+        # server=server,
         clients=clients,
         T=config.training.T,
-        K=config.training.local_steps,
+        # K=config.training.local_steps,
         get_metrics=get_gradient_metrics,
     )
     print("Training finished!")

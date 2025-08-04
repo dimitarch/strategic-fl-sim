@@ -9,15 +9,15 @@ from shakespearedataloader import ShakespeareDataset
 from torch import nn
 from torch.utils.data import DataLoader
 
-from strategicfl.actions import create_scalar_action
+from models import LSTM
 from strategicfl.agents import Client, Server
-from strategicfl.aggregation import get_aggregate
-from strategicfl.models import LSTM
+from strategicfl.training.evaluate import evaluate_with_ids
+from strategicfl.training.metrics import get_gradient_metrics
+from strategicfl.utils.actions import create_scalar_action
+from strategicfl.utils.aggregation import get_aggregate
 from utils.config import load_config, save_config
 from utils.device import get_device
-from utils.evaluate import evaluate_with_ids
 from utils.io import generate_save_name, make_dir
-from utils.metrics import get_gradient_metrics
 
 
 def get_data(path: str):

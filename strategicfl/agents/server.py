@@ -34,7 +34,9 @@ class Server(BaseServer):
         clients: List[BaseClient],
         T: int = 1000,
         client_fraction: float = 1.0,
-        get_metrics: Optional[Any] = None,
+        get_metrics: Optional[
+            Any
+        ] = None,  # TODO Hacky, make it so the function returns the gradients and aggregate, nothing else, just a record of the training
     ) -> Tuple[List[List[float]], Optional[List[dict]]]:
         """Coordinate federated training across clients.
 
@@ -96,7 +98,6 @@ class Server(BaseServer):
 
     def broadcast_model(self, clients: List[BaseClient]) -> None:
         """Broadcast only trainable parameters to all clients."""
-        # Get state dict of only trainable parameters
         trainable_state = {
             name: param.detach().clone()
             for name, param in self.model.named_parameters()
