@@ -13,12 +13,22 @@ from strategicfl.actions import create_scalar_action
 from strategicfl.agents import Client, Server
 from strategicfl.aggregation import get_aggregate
 from strategicfl.models import BertWithClassifier
-from strategicfl.trainer import train
 from utils.config import load_config, save_config
 from utils.device import get_device
 from utils.evaluate import evaluate_with_ids
 from utils.io import generate_save_name, make_dir
 from utils.metrics import get_gradient_metrics
+
+
+def freeze_bert_encoder(model):
+    """Freeze BERT encoder layers, keep only classifier trainable."""
+    for name, param in model.named_parameters():
+        if "classifier" in name:
+            param.requires_grad = True
+            print(f"Trainable: {name}")
+        else:
+            param.requires_grad = False
+            print(f"Frozen: {name}")
 
 
 def get_data(path: str):
@@ -50,7 +60,6 @@ if __name__ == "__main__":
     print("Using configuration:")
     print(OmegaConf.to_yaml(config, resolve=True))
 
-    # Load data
     # Load data
     print("Loading training data...")
     data_dict, user_names = get_data(config.data.train_path)
@@ -87,13 +96,30 @@ if __name__ == "__main__":
     print("Creating server agent...")
     server_model = BertWithClassifier()
 
+    # Freeze BERT encoder, keep only classifier trainable
+    freeze_bert_encoder(server_model)
+
+    # Count trainable parameters
+    trainable_params = sum(
+        p.numel() for p in server_model.parameters() if p.requires_grad
+    )
+    total_params = sum(p.numel() for p in server_model.parameters())
+    print(
+        f"Trainable parameters: {trainable_params:,} / {total_params:,} ({100 * trainable_params / total_params:.1f}%)"
+    )
+
     server = Server(
         device=device,
         model=server_model,
         criterion=nn.CrossEntropyLoss(),
-        optimizer=torch.optim.SGD(server_model.parameters(), lr=config.training.lr),
+        optimizer=torch.optim.SGD(
+            [
+                p for p in server_model.parameters() if p.requires_grad
+            ],  # Only trainable params
+            lr=config.training.lr,
+        ),
         aggregate_fn=get_aggregate(method=config.aggregation.method),
-        agent_id="server",  # Add server ID
+        agent_id="server",
     )
     print(f"Created {server}")
 
@@ -122,7 +148,7 @@ if __name__ == "__main__":
         train_dataset = TwitterDataset(
             client_user_names,
             data_dict,
-            max_length=config.model.get("max_length", 512),  # Configurable max length
+            max_length=config.model.get("max_length", 512),
         )
         test_dataset = TwitterDataset(
             client_user_names,
@@ -133,32 +159,39 @@ if __name__ == "__main__":
         # Create DataLoaders
         train_dataloader = DataLoader(
             train_dataset,
-            batch_size=config.training.get("batch_size", 16),  # Smaller batch for BERT
+            batch_size=config.training.get("batch_size", 16),
             shuffle=True,
             pin_memory=True if device.type == "cuda" else False,
         )
 
         test_dataloader = DataLoader(
             test_dataset,
-            batch_size=config.training.get(
-                "eval_batch_size", 32
-            ),  # Smaller eval batch for BERT
+            batch_size=config.training.get("eval_batch_size", 32),
             shuffle=False,
             pin_memory=True if device.type == "cuda" else False,
         )
 
-        # Create client
+        # Create client model with same frozen structure
         client_model = BertWithClassifier().to(device)
+        freeze_bert_encoder(client_model)  # Same freezing pattern
 
         client = Client(
             device=device,
-            train_dataloader=train_dataloader,  # Use standard DataLoader
-            test_dataloader=test_dataloader,  # Use standard DataLoader
+            train_dataloader=train_dataloader,
+            test_dataloader=test_dataloader,
             model=client_model,
             criterion=nn.CrossEntropyLoss(),
-            optimizer=torch.optim.SGD(client_model.parameters(), lr=config.training.lr),
+            optimizer=torch.optim.SGD(
+                [
+                    p for p in client_model.parameters() if p.requires_grad
+                ],  # Only trainable params
+                lr=config.training.lr,
+            ),
             action=create_scalar_action(alpha, beta),
-            agent_id=client_id,  # Add client ID
+            local_steps=config.training.get(
+                "local_steps", 1
+            ),  # Add local_steps support
+            agent_id=client_id,
         )
 
         clients.append(client)
@@ -166,11 +199,9 @@ if __name__ == "__main__":
 
     # Train
     print("Starting training...")
-    all_losses, all_metrics = train(
-        server=server,
+    all_losses, all_metrics = server.train(
         clients=clients,
         T=config.training.T,
-        K=config.training.local_steps,
         get_metrics=get_gradient_metrics,
     )
     print("Training finished!")
@@ -197,7 +228,9 @@ if __name__ == "__main__":
         "beta_0": config.clients.beta_0,
         "beta_1": config.clients.beta_1,
         "T": config.training.T,
-        "local_steps": config.training.local_steps,
+        "local_steps": config.training.get("local_steps", 1),
+        "trainable_params": trainable_params,
+        "total_params": total_params,
         "train_gradsizes_per_step": grad_norms_array,
         "train_cosine_per_step": cosine_sims_array,
         "train_losses_per_step": losses_array,
@@ -219,3 +252,6 @@ if __name__ == "__main__":
     print(f"Final test accuracies: {results['test_accuracy']}")
     print(f"Final test losses: {results['test_losses']}")
     print(f"Results saved to: {save_name}.pkl")
+    print(
+        f"Training efficiency: {trainable_params:,} / {total_params:,} parameters updated"
+    )
