@@ -42,7 +42,8 @@ if __name__ == "__main__":
     # Load configuration
     config = load_config(args.config)
     config.training.T = 2000
-    config.clients.n_players = 5
+    config.training.local_steps = 2
+    config.clients.n_players = 3
 
     # Make sure that the destination folders for results exist
     make_dir("./results")

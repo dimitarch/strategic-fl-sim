@@ -8,6 +8,13 @@ from .base_client import BaseClient
 
 
 class Client(BaseClient):
+    """
+    Standard federated learning client with strategic gradient manipulation.
+
+    Supports multi-step local training and applies configurable strategic actions
+    to gradients before sending them to the server.
+    """
+
     def __init__(
         self,
         device: torch.device,
@@ -20,6 +27,20 @@ class Client(BaseClient):
         local_steps: int = 1,
         agent_id: str = "client",
     ):
+        """
+        Initialize client with model, data, and strategic behavior.
+
+        Args:
+            device: Computing device (CPU/GPU)
+            train_dataloader: Training data loader
+            test_dataloader: Test data loader
+            model: Neural network model
+            criterion: Loss function
+            optimizer: Parameter optimizer
+            action: Strategic action function for gradient manipulation
+            local_steps: Number of local SGD steps per round (default: 1)
+            agent_id: Client identifier (default: "client")
+        """
         self.device = device
         self.model = model
         self.criterion = criterion
@@ -32,35 +53,35 @@ class Client(BaseClient):
         self.local_steps = local_steps
 
     def apply_action(self, gradient):
+        """Apply configured strategic action to gradient."""
         return self.action(gradient)
 
     def receive_global_model(self, trainable_state_dict: dict) -> None:
-        """Receive and apply only trainable parameters from server."""
-        # Get current full state dict
+        """Update local model with trainable parameters from server."""
         current_state = self.model.state_dict()
-
-        # Update only the trainable parameters that were sent
         current_state.update(trainable_state_dict)
-
-        # Load the updated state dict
         self.model.load_state_dict(current_state)
 
     def update(self, inputs, labels) -> torch.Tensor:
+        """Perform single SGD step on given batch."""
         inputs = inputs.to(self.device)
         labels = labels.to(self.device)
 
         self.optimizer.zero_grad()
-
         outputs = self.model(inputs)
         loss = self.criterion(outputs, labels)
         loss.backward()
-
         self.optimizer.step()
 
         return loss
 
     def local_train(self) -> Tuple[List[torch.Tensor], torch.Tensor]:
-        """Perform local training and return gradients for trainable parameters only."""
+        """
+        Perform local training with multi-step support.
+
+        For multi-step: computes gradient as parameter difference.
+        For single-step: uses direct backpropagation gradients.
+        """
         try:
             inputs, labels = next(self.train_iterator)
         except StopIteration:
@@ -68,6 +89,7 @@ class Client(BaseClient):
             inputs, labels = next(self.train_iterator)
 
         initial_model = copy.deepcopy(self.model)
+
         if self.local_steps > 1:  # Multi-step local training
             for _ in range(self.local_steps):
                 loss = self.update(inputs, labels)
@@ -76,13 +98,12 @@ class Client(BaseClient):
             for local_param, server_param in zip(
                 self.model.parameters(), initial_model.parameters()
             ):
-                if local_param.requires_grad:  # Only trainable parameters
+                if local_param.requires_grad:
                     grad.append((server_param - local_param).detach().clone())
         else:  # Single step case
             outputs = self.model(inputs.to(self.device))
             loss = self.criterion(outputs, labels.to(self.device))
             loss.backward()
-            # Only get gradients for trainable parameters
             grad = [
                 p.grad.detach().clone()
                 for p in self.model.parameters()
@@ -90,33 +111,31 @@ class Client(BaseClient):
             ]
             self.model.zero_grad()
 
-        # Apply action to each trainable gradient
+        # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
         return sent_grad, loss
 
     def evaluate(
         self, inputs: torch.Tensor, labels: torch.Tensor
     ) -> Tuple[float, float]:
+        """Evaluate on batch with temporary eval mode."""
         was_training = self.model.training
         self.model.eval()
 
         with torch.no_grad():
             inputs = inputs.to(self.device)
             labels = labels.to(self.device)
-
             outputs = self.model(inputs)
             _, predictions = torch.max(outputs, 1)
-
             accuracy = (predictions == labels).float().mean().item()
             loss = self.criterion(outputs, labels).item()
 
         if was_training:
             self.model.train()
-
         return accuracy, loss
 
     def predict(self, inputs: torch.Tensor) -> torch.Tensor:
-        """Make predictions on input data."""
+        """Generate predictions with temporary eval mode."""
         was_training = self.model.training
         self.model.eval()
 
@@ -130,7 +149,7 @@ class Client(BaseClient):
         return predictions
 
     def evaluate_on_test_set(self):
-        """Evaluate model on entire test set using batched processing."""
+        """Evaluate on entire test set with batched processing."""
         was_training = self.model.training
         self.model.eval()
 
@@ -156,5 +175,4 @@ class Client(BaseClient):
 
         avg_loss = total_loss / total_samples
         accuracy = total_correct / total_samples
-
         return accuracy, avg_loss
