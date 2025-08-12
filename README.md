@@ -1,6 +1,8 @@
 # StrategicFL: A Framework for Strategic Federated Learning
 
-A Python framework for simulating strategic federated learning scenarios where clients can behave adversarially by manipulating gradient updates before sending them to the server. This framework enables researchers to study the robustness of different aggregation methods against strategic client behavior.
+A Python framework for simulating strategic Federated Learning (FL) scenarios where clients can behave adversarially by manipulating gradient updates before sending them to the server. This framework enables researchers to study the robustness of different aggregation methods against strategic client behavior.
+
+Originally intended to study strategic gradient manipulations in heterogeneous FL, the framework is highly flexible and extensible allowing for a wide variety of clients---with different datasets, data quality, batch sizes, optimizers, local steps, gradient actions, etc. It comes with multi-GPU support out of the box (on a single node for now, but that should suffice for simulation purposes). We hope it will be useful for researchers and practitioners interested in modeling strategic behavior and incentive dynamics in FL.
 
 ## Quick Start
 
@@ -67,13 +69,13 @@ losses, metrics = server.train(
 )
 ```
 
-### Examples
+### Demos and Experiments
 
-The framework includes ready-to-use examples for the three datasets: FeMNIST, Shakespeare and Sent140/Twitter.
+The framework includes ready-to-use demo Jupyter notebooks for the three datasets---FeMNIST, Shakespeare and Sent140/Twitter. We also include example experiments with config management, ready for scheduling on GPU clusters.
 
 ### Metrics during Training
 
-Use a custom metrics function to extract gradient metrics for each step. Otherwise, the memory usage is too high to store the entire history of client and aggregated gradients.
+We use a custom metrics function to extract gradient metrics at each training step. Otherwise, the memory usage is too high to store the entire history of client and aggregated gradients. Perhaps, a bit hacky, but sufficient for research purposes.
 
 ## Strategic Behavior
 
@@ -115,7 +117,8 @@ strategicfl/
 ├── strategicfl/          # Core framework
 │   ├── agents/           # Client and server implementations
 │   └── utils/            # Predefined aggregation, actions, metrics, evaluation
-├── examples/            # Dataset-specific experiments
+├── demos/               # Dataset-specific Jupyter notebook demos
+├── experiments/         # Dataset-specific experiments with config management ready for scheduling
 ├── models/              # Models: CNN, LSTM, BERT wrapper
 └── utils/               # Configuration and utilities
 ```
@@ -162,7 +165,7 @@ client = Client(
 
 ## Acknowledgements
 
-We thank the authors of [LEAF](https://leaf.cmu.edu). We are also grateful for [Claude](https://claude.ai).
+We thank the authors of [LEAF](https://leaf.cmu.edu). We acknowledge using [Claude](https://claude.ai) during development.
 
 ## Citation
 
