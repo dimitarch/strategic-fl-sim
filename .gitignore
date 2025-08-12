@@ -4,6 +4,7 @@ data/
 results/
 images/
 images-old/
+exp/
 archive/
 .DS_Store
 __pycache__/

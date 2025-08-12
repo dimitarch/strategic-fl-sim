@@ -20,6 +20,10 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+### Data
+
+Download a compressed folder of the datafile from [here](https://drive.google.com/file/d/1imILs8cKVf_ex3t3DpvGz7aoaugAjO4M/view?usp=sharing). We use the [LEAF](https://leaf.cmu.edu) datasets with some postprocessing to make them more uniform for loading in Python. Unzip and place in the base directory of the repo.
+
 ### Basic Usage
 
 ```python
@@ -66,54 +70,15 @@ model, losses, metrics = train(
 )
 ```
 
-### Running Experiments
+### Examples
 
-The framework includes ready-to-use experiments for three datasets:
-
-```bash
-# FEMNIST (handwritten characters)
-cd experiments/femnist
-python experiment.py --config config.yaml
-
-# Shakespeare (next character prediction)
-cd experiments/shakespeare
-python experiment.py --config config.yaml
-
-# Twitter (sentiment analysis)
-cd experiments/twitter
-python experiment.py --config config.yaml
-```
-
-## Configuration
-
-Experiments are configured using YAML files. Example configuration:
-
-```yaml
-experiment:
-  id: "strategic_experiment"
-  save_dir: "./results/femnist"
-
-training:
-  T: 1000                    # Training rounds
-  lr: 0.06                   # Learning rate
-  local_steps: 1             # Local SGD steps
-
-clients:
-  n_players: 3               # Clients per round
-  alpha_0: 1.0               # Honest client scaling
-  alpha_1: 2.0               # Adversarial client scaling
-  beta_0: 0.0                # Honest client noise
-  beta_1: 0.1                # Adversarial client noise
-
-aggregation:
-  method: "median"           # Aggregation method
-```
+The framework includes ready-to-use examples for the three datasets: FeMNIST, Shakespeare and Sent140/Twitter.
 
 ## Strategic Behavior
 
 ### Client Actions
-- **α (Alpha)**: Gradient scaling factor (α > 1 amplifies, α < 1 diminishes)
-- **β (Beta)**: Noise injection level (β > 0 adds Gaussian noise)
+- **alpha**: Gradient scaling factor
+- **beta**: Noise injection level (beta > 0 adds Gaussian noise)
 
 ### Aggregation Methods
 - **Mean**: Standard federated averaging (vulnerable to adversaries)
@@ -144,25 +109,12 @@ aggregation:
 strategicfl/
 ├── strategicfl/           # Core framework
 │   ├── agents/           # Client and server implementations
-│   ├── models/           # Neural network architectures
-│   ├── actions.py        # Strategic client behaviors
-│   ├── aggregation.py    # Robust aggregation methods
-│   └── trainer.py        # Federated training loop
-├── experiments/          # Dataset-specific experiments
-├── utils/               # Configuration and utilities
-├── data/                # Raw datasets (via Git LFS)
-└── results/             # Experiment outputs (via Git LFS)
+│   ├── training/         # Functions for metrics and evaluation during/after training
+│   └── utils/            # Predefined aggregation and action utils
+├── examples/            # Dataset-specific experiments
+├── models/              # Models: CNN, LSTM, BERT wrapper
+└── utils/               # Configuration and utilities
 ```
-
-## Results and Analysis
-
-Each experiment saves comprehensive results including:
-- **Training losses** per round and client
-- **Gradient norms** and cosine similarities
-- **Final test accuracies** for each client group
-- **Configuration** for full reproducibility
-
-Results are saved as pickle files and can be analyzed using standard Python data science tools.
 
 ## Extending the Framework
 
@@ -208,19 +160,21 @@ client = Client(
 
 We thank the authors of [LEAF](https://leaf.cmu.edu). We are also grateful for [Claude](https://claude.ai).
 
-<!-- ## Citation
+## Citation
 
-If you use this framework in your research, please cite:
+If you found this helpful and used this framework in your research, please use the following citation:
 
-<!-- ```bibtex
-@software{chakarov2025strategicfl,
-  author = {Chakarov, Dimitar},
-  title = {StrategicFL: A Framework for Strategic Federated Learning},
-  url = {https://github.com/yourusername/strategicfl},
-  version = {0.1.0},
-  year = {2025}
+```bibtex
+@misc{chakarov2025incentivizingtruthfulcollaborationheterogeneous,
+      title={Incentive-Compatible Collaboration in Heterogeneous Federated Learning},
+      author={Dimitar Chakarov and Nikita Tsoy and Kristian Minchev and Nikola Konstantinov},
+      year={2025},
+      eprint={2412.00980},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2412.00980},
 }
-``` --> -->
+```
 
 ## License
 
