@@ -17,7 +17,7 @@ version: "0.1.0"
 
 preferred-citation:
   type: misc
-  title: "Towards Incentivizing Truthful Collaboration in Heterogeneous Federated Learning"
+  title: "Incentive-Compatible Collaboration in Heterogeneous Federated Learning"
   authors:
     - family-names: "Chakarov"
       given-names: "Dimitar"
