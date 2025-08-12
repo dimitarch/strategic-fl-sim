@@ -20,18 +20,14 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### Data
-
-Download a compressed folder of the datafile from [here](https://drive.google.com/file/d/1imILs8cKVf_ex3t3DpvGz7aoaugAjO4M/view?usp=sharing). We use the [LEAF](https://leaf.cmu.edu) datasets with some postprocessing to make them more uniform for loading in Python. Unzip and place in the base directory of the repo.
-
 ### Basic Usage
 
 ```python
 from strategicfl.agents import Client, Server
-from strategicfl.actions import create_scalar_action
-from strategicfl.aggregation import get_aggregate
-from strategicfl.models import CNN
-from strategicfl.trainer import train
+from strategicfl.utils.actions import create_scalar_action
+from strategicfl.utils.aggregation import get_aggregate
+from strategicfl.utils.evaluate import evaluate_with_ids
+from strategicfl.utils.metrics import get_gradient_metrics
 
 # Create server with robust aggregation
 server = Server(
@@ -39,40 +35,45 @@ server = Server(
     model=CNN(),
     criterion=nn.CrossEntropyLoss(),
     optimizer=torch.optim.SGD(model.parameters(), lr=0.06),
-    aggregate=get_aggregate(method="median")  # Robust to adversaries
+    aggregate=get_aggregate(method="mean")
 )
 
 # Create clients with strategic behavior
 honest_client = Client(
     device=device,
-    dataloader=dataloader,
+    train_dataloader=train_dataloader,  # Depending on the dataset
+    test_dataloader=test_dataloader,    # Depending on the dataset
     model=CNN(),
     criterion=nn.CrossEntropyLoss(),
-    optimizer=optimizer,
+    optimizer=torch.optim.SGD(model.parameters(), lr=0.06),
     action=create_scalar_action(alpha=1.0, beta=0.0)  # Honest
 )
 
 adversarial_client = Client(
     device=device,
-    dataloader=dataloader,
+    train_dataloader=train_dataloader,  # Depending on the dataset
+    test_dataloader=test_dataloader,    # Depending on the dataset
     model=CNN(),
     criterion=nn.CrossEntropyLoss(),
-    optimizer=optimizer,
+    optimizer=torch.optim.SGD(model.parameters(), lr=0.06),
     action=create_scalar_action(alpha=2.0, beta=0.1)  # Strategic
 )
 
 # Train the federated model
-model, losses, metrics = train(
-    server=server,
-    clients=[honest_client, adversarial_client],
-    T=1000,  # Training rounds
-    K=1      # Local steps
+losses, metrics = server.train(
+    clients=clients,
+    T=config.training.T,
+    get_metrics=get_gradient_metrics, # Custom metrics function to extract per-step metrics; otherwise, memory usage is too high to store the entire history
 )
 ```
 
 ### Examples
 
 The framework includes ready-to-use examples for the three datasets: FeMNIST, Shakespeare and Sent140/Twitter.
+
+### Metrics during Training
+
+Use a custom metrics function to extract gradient metrics for each step. Otherwise, the memory usage is too high to store the entire history of client and aggregated gradients.
 
 ## Strategic Behavior
 
@@ -87,6 +88,10 @@ The framework includes ready-to-use examples for the three datasets: FeMNIST, Sh
 - **Trimmed Mean**: Remove largest gradients before averaging
 
 ## Datasets
+
+### Data
+
+Download a compressed folder of the data files from [here](https://drive.google.com/file/d/1imILs8cKVf_ex3t3DpvGz7aoaugAjO4M/view?usp=sharing). We use the [LEAF](https://leaf.cmu.edu) datasets with some postprocessing to make them more uniform for loading in Python. Unzip and place in the base directory of the repo.
 
 ### FEMNIST
 - **Task**: Handwritten character recognition (62 classes)
@@ -107,10 +112,9 @@ The framework includes ready-to-use examples for the three datasets: FeMNIST, Sh
 
 ```
 strategicfl/
-├── strategicfl/           # Core framework
+├── strategicfl/          # Core framework
 │   ├── agents/           # Client and server implementations
-│   ├── training/         # Functions for metrics and evaluation during/after training
-│   └── utils/            # Predefined aggregation and action utils
+│   └── utils/            # Predefined aggregation, actions, metrics, evaluation
 ├── examples/            # Dataset-specific experiments
 ├── models/              # Models: CNN, LSTM, BERT wrapper
 └── utils/               # Configuration and utilities
