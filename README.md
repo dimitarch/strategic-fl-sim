@@ -2,7 +2,7 @@
 
 A Python framework for simulating strategic Federated Learning (FL) scenarios where clients can behave adversarially by manipulating gradient updates before sending them to the server. This framework enables researchers to study the robustness of different aggregation methods against strategic client behavior.
 
-Originally intended to study strategic gradient manipulations in heterogeneous FL, the framework is highly flexible and extensible allowing for a wide variety of clients---with different datasets, data quality, batch sizes, optimizers, local steps, gradient actions, etc. It comes with multi-GPU support out of the box (on a single node for now, but that should suffice for simulation purposes). We hope it will be useful for researchers and practitioners interested in modeling strategic behavior and incentive dynamics in FL.
+The package was originally intended to study strategic gradient manipulations in heterogeneous FL. In its current form the framework is highly flexible and extensible allowing for a wide variety of clients---with different datasets, data quality, batch sizes, optimizers, local steps, gradient actions, etc. It comes with multi-GPU support out of the box (on a single node for now, but that should suffice for simulation purposes). We hope it will be useful for researchers and practitioners interested in modeling strategic behavior and incentive dynamics in FL.
 
 ## Quick Start
 
