@@ -65,31 +65,13 @@ adversarial_client = Client(
 losses, metrics = server.train(
     clients=clients,
     T=config.training.T,
-    get_metrics=get_gradient_metrics, # Custom metrics function to extract per-step metrics; otherwise, memory usage is too high to store the entire history
+    get_metrics=get_gradient_metrics, # See below. Custom metrics function to extract per-step metrics; otherwise, memory usage is too high to store the entire history.
 )
 ```
 
-### Demos and Experiments
+## Demos and Experiments
 
 The framework includes ready-to-use demo Jupyter notebooks for the three datasets---FeMNIST, Shakespeare and Sent140/Twitter. We also include example experiments with config management, ready for scheduling on GPU clusters.
-
-### Metrics during Training
-
-We use a custom metrics function to extract gradient metrics at each training step. Otherwise, the memory usage is too high to store the entire history of client and aggregated gradients. Perhaps, a bit hacky, but sufficient for research purposes.
-
-## Strategic Behavior
-
-### Client Actions
-- **alpha**: Gradient scaling factor
-- **beta**: Noise injection level (beta > 0 adds Gaussian noise)
-
-### Aggregation Methods
-- **Mean**: Standard federated averaging (vulnerable to adversaries)
-- **Weighted Average**: Weight by dataset size
-- **Median**: Coordinate-wise median (robust to outliers)
-- **Trimmed Mean**: Remove largest gradients before averaging
-
-## Datasets
 
 ### Data
 
@@ -110,18 +92,21 @@ Download a compressed folder of the data files from [here](https://drive.google.
 - **Model**: BERT-based classifier
 - **Clients**: Different Twitter users
 
-## Project Structure
+## Training Metrics
 
-```
-strategicfl/
-├── strategicfl/          # Core framework
-│   ├── agents/           # Client and server implementations
-│   └── utils/            # Predefined aggregation, actions, metrics, evaluation
-├── demos/               # Dataset-specific Jupyter notebook demos
-├── experiments/         # Dataset-specific experiments with config management ready for scheduling
-├── models/              # Models: CNN, LSTM, BERT wrapper
-└── utils/               # Configuration and utilities
-```
+We use a custom metrics function to extract gradient metrics at each training step. Otherwise, the memory usage is too high to store the entire history of client and aggregated gradients. Perhaps, a bit hacky, but sufficient for research purposes.
+
+## Strategic Behaviors Already in the Package
+
+### Client Actions
+- **alpha**: Gradient scaling factor
+- **beta**: Noise injection level (beta > 0 adds Gaussian noise)
+
+### Aggregation Methods
+- **Mean**: Standard federated averaging (vulnerable to adversaries)
+- **Weighted Average**: Weight by dataset size
+- **Median**: Coordinate-wise median (robust to outliers)
+- **Trimmed Mean**: Remove largest gradients before averaging
 
 ## Extending the Framework
 
@@ -152,6 +137,19 @@ client = Client(
     # ...
     action=create_custom_action(params)  # Honest
 )
+```
+
+## Project Structure
+
+```
+strategicfl/
+├── strategicfl/          # Core framework
+│   ├── agents/           # Client and server implementations
+│   └── utils/            # Predefined aggregation, actions, metrics, evaluation
+├── demos/               # Dataset-specific Jupyter notebook demos
+├── experiments/         # Dataset-specific experiments with config management ready for scheduling
+├── models/              # Models: CNN, LSTM, BERT wrapper
+└── utils/               # Configuration and utilities
 ```
 
 ## Requirements
