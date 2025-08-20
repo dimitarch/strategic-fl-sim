@@ -13,6 +13,12 @@ dependencies = [
     "omegaconf",
     "tqdm",
     "transformers",
+    "matplotlib"
 ]
 
+# [tool.setuptools.packages.find]
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
+where = ["src"]

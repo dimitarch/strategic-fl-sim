@@ -143,13 +143,14 @@ client = Client(
 
 ```
 strategicfl/
-├── strategicfl/          # Core framework
-│   ├── agents/           # Client and server implementations
-│   └── utils/            # Predefined aggregation, actions, metrics, evaluation
-├── demos/               # Dataset-specific Jupyter notebook demos
-├── experiments/         # Dataset-specific experiments with config management ready for scheduling
-├── models/              # Models: CNN, LSTM, BERT wrapper
-└── utils/               # Configuration and utilities
+├── src/
+│   ├── strategicfl/    # Core framework
+│   │   ├── agents/         # Client and server implementations
+│   │   └── utils/          # Predefined aggregation, actions, metrics, evaluation
+│   ├── models/             # Models: CNN, LSTM, BERT wrapper
+│   └── utils/              # Utils for io, device and config setup
+├── notebooks/          # Dataset-specific Jupyter notebook demos
+└── experiments/        # Dataset-specific experiments with config management ready for scheduling
 ```
 
 ## Requirements
@@ -160,6 +161,7 @@ strategicfl/
 - OmegaConf
 - tqdm
 - transformers (optional, for Twitter experiments)
+- matplotlib (optional, for notebook demos)
 
 ## Acknowledgements
 
