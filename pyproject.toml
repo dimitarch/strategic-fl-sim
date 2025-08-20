@@ -1,24 +1,48 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "strategicfl"
 version = "0.1.0"
-description = "Strategic Federated Learning Framework"
+description = "A Framework for Strategic Federated Learning"
+readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "torch",
-    "numpy",
-    "omegaconf",
-    "tqdm",
-    "transformers",
-    "matplotlib"
+    "torch>=1.9.0",
+    "numpy>=1.21.0",
+    "omegaconf>=2.1.0",
+    "tqdm>=4.60.0",
 ]
 
-# [tool.setuptools.packages.find]
+[project.optional-dependencies]
+experiments = [
+    "transformers>=4.0.0",
+    "matplotlib>=3.3.0",
+]
+dev = [
+    "ruff",
+]
+all = [
+    "strategicfl[experiments,dev]",
+]
+
+[project.urls]
+Repository = "https://github.com/dimitarch/strategicfl"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I"]  # errors, warnings, pyflakes, isort
+ignore = ["E501"]  # line too long (handled by formatter)
+
+[tool.ruff.lint.isort]
+known-first-party = ["strategicfl", "utils", "models"]
