@@ -48,6 +48,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load configuration
+    if args.config is None:
+        print("Using default config! May break functionality!")
+
     config = load_config(args.config)
     config.training.T = 10
     config.clients.n_players = 5
