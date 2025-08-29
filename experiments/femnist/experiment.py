@@ -10,11 +10,11 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from models import CNN
-from strategicfl.agents import Client, Server
-from strategicfl.utils.actions import create_scalar_action
-from strategicfl.utils.aggregation import get_aggregate
-from strategicfl.utils.evaluate import evaluate_with_ids
-from strategicfl.utils.metrics import get_gradient_metrics
+from strategicflsim.agents import Client, Server
+from strategicflsim.utils.actions import create_scalar_action
+from strategicflsim.utils.aggregation import get_aggregate
+from strategicflsim.utils.evaluate import evaluate_with_ids
+from strategicflsim.utils.metrics import get_gradient_metrics
 from utils.config import load_config, save_config
 from utils.device import get_device
 from utils.io import generate_save_name, make_dir

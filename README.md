@@ -1,8 +1,8 @@
-# `strategicfl`: A Package for Simulating Strategic Federated Learning
+# `strategic-fl-sim`: A Package for Simulating Strategic Federated Learning
 
-A Python framework for simulating strategic Federated Learning (FL) scenarios where clients can behave adversarially by manipulating gradient updates before sending them to the server. This framework enables researchers to study the robustness of different aggregation methods against strategic client behavior.
+A Python package for simulating strategic Federated Learning (FL) scenarios where clients can behave adversarially by manipulating gradient updates before sending them to the server. This package enables researchers to study the robustness of different aggregation methods against strategic client behavior.
 
-The package was originally intended to study strategic gradient manipulations in heterogeneous FL. In its current form the framework is highly flexible and extensible allowing for a wide variety of clients---with different datasets, data quality, batch sizes, optimizers, local steps, gradient actions, etc. It comes with multi-GPU support out of the box (on a single node for now, but that should suffice for simulation purposes). We hope it will be useful for researchers and practitioners interested in modeling strategic behavior and incentive dynamics in FL.
+The package was originally intended to study strategic gradient manipulations in heterogeneous FL. In its current form the package is highly flexible and extensible allowing for a wide variety of clients---with different datasets, data quality, batch sizes, optimizers, local steps, gradient actions, etc. It comes with multi-GPU support out of the box (on a single node for now, but that should suffice for simulation purposes). We hope it will be useful for researchers and practitioners interested in modeling strategic behavior and incentive dynamics in FL.
 
 ## Quick Start
 
@@ -71,7 +71,7 @@ losses, metrics = server.train(
 
 ## Demos and Experiments
 
-The framework includes ready-to-use demo Jupyter notebooks for the three datasets---FeMNIST, Shakespeare and Sent140/Twitter (all generated from [LEAF](https://leaf.cmu.edu)). We also include example experiments with config management, ready for scheduling on GPU clusters.
+The package includes ready-to-use demo Jupyter notebooks for the three datasets---FeMNIST, Shakespeare and Sent140/Twitter (all generated from [LEAF](https://leaf.cmu.edu)). We also include example experiments with config management, ready for scheduling on GPU clusters.
 
 ### Data
 
@@ -108,7 +108,7 @@ We use a custom metrics function to extract gradient metrics at each training st
 - **Median**: Coordinate-wise median (robust to outliers)
 - **Trimmed Mean**: Remove largest gradients before averaging
 
-## Extending the Framework
+## Extending the Package
 
 ### Adding New Aggregation Methods
 
@@ -120,7 +120,7 @@ def custom_aggregate(gradients):
 
 server = Server(
     # ...
-    aggregate=custom_aggregate  # Robust to adversaries
+    aggregate=custom_aggregate
 )
 ```
 
@@ -135,7 +135,7 @@ def create_custom_action(*params):
 
 client = Client(
     # ...
-    action=create_custom_action(params)  # Honest
+    action=create_custom_action(params)
 )
 ```
 
@@ -144,7 +144,7 @@ client = Client(
 ```
 strategicfl/
 ├── src/
-│   ├── strategicfl/    # Core framework
+│   ├── strategicfl/    # Core package
 │   │   ├── agents/         # Client and server implementations
 │   │   └── utils/          # Predefined aggregation, actions, metrics, evaluation
 │   ├── models/             # Models: CNN, LSTM, BERT wrapper
@@ -165,11 +165,11 @@ strategicfl/
 
 ## Acknowledgements
 
-We thank the authors of [LEAF](https://leaf.cmu.edu) for their work in providing the datasets. We acknowledge using [Claude](https://claude.ai) during development.
+We thank the authors of [LEAF](https://leaf.cmu.edu) for their work in providing the datasets. We acknowledge help from [Claude](https://claude.ai) during development.
 
 ## Citation
 
-If you found this helpful and used this framework in your research, please use the following citation:
+If you found this helpful and used this package in your research, please use the following citation:
 
 ```bibtex
 @misc{chakarov2025incentivizing,

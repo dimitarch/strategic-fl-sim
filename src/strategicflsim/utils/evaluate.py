@@ -1,6 +1,6 @@
 from typing import List
 
-from strategicfl.agents import Client, Server
+from strategicflsim.agents import Client, Server
 
 
 def evaluate_with_ids(server: Server, clients: List[Client]) -> tuple[dict, dict]:
