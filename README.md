@@ -10,8 +10,8 @@ The package was originally intended to study strategic gradient manipulations in
 
 ```bash
 # Clone the repository
-git clone https://github.com/dimitarch/strategicfl.git
-cd strategicfl
+git clone https://github.com/dimitarch/strategic-fl-sim.git
+cd strategic-fl-sim
 
 # If using venv and requirements.txt
 python -m venv venv
@@ -25,11 +25,11 @@ pip install -e .
 ### Basic Usage
 
 ```python
-from strategicfl.agents import Client, Server
-from strategicfl.utils.actions import create_scalar_action
-from strategicfl.utils.aggregation import get_aggregate
-from strategicfl.utils.evaluate import evaluate_with_ids
-from strategicfl.utils.metrics import get_gradient_metrics
+from strategicflsim.agents import Client, Server
+from strategicflsim.utils.actions import create_scalar_action
+from strategicflsim.utils.aggregation import get_aggregate
+from strategicflsim.utils.evaluate import evaluate_with_ids
+from strategicflsim.utils.metrics import get_gradient_metrics
 
 # Create server with robust aggregation
 server = Server(
@@ -142,9 +142,9 @@ client = Client(
 ## Project Structure
 
 ```
-strategicfl/
+strategic-fl-sim/
 ├── src/
-│   ├── strategicfl/    # Core package
+│   ├── strategicflsim/    # Core package
 │   │   ├── agents/         # Client and server implementations
 │   │   └── utils/          # Predefined aggregation, actions, metrics, evaluation
 │   ├── models/             # Models: CNN, LSTM, BERT wrapper
