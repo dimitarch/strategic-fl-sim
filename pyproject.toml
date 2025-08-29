@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "strategic-fl-sim"
 version = "0.1.0"
-description = "A Framework for Strategic Federated Learning"
+description = "A Package for Strategic Federated Learning"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -28,7 +28,7 @@ all = [
 ]
 
 [project.urls]
-Repository = "https://github.com/dimitarch/strategicfl"
+Repository = "https://github.com/dimitarch/strategic-fl-sim"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
