@@ -1,4 +1,4 @@
-# StrategicFL: A Framework for Strategic Federated Learning
+# `strategicfl`: A Package for Simulating Strategic Federated Learning
 
 A Python framework for simulating strategic Federated Learning (FL) scenarios where clients can behave adversarially by manipulating gradient updates before sending them to the server. This framework enables researchers to study the robustness of different aggregation methods against strategic client behavior.
 
@@ -71,11 +71,11 @@ losses, metrics = server.train(
 
 ## Demos and Experiments
 
-The framework includes ready-to-use demo Jupyter notebooks for the three datasets---FeMNIST, Shakespeare and Sent140/Twitter. We also include example experiments with config management, ready for scheduling on GPU clusters.
+The framework includes ready-to-use demo Jupyter notebooks for the three datasets---FeMNIST, Shakespeare and Sent140/Twitter (all generated from [LEAF](https://leaf.cmu.edu)). We also include example experiments with config management, ready for scheduling on GPU clusters.
 
 ### Data
 
-Download a compressed folder of the data files from [here](https://drive.google.com/file/d/1imILs8cKVf_ex3t3DpvGz7aoaugAjO4M/view?usp=sharing). We use the [LEAF](https://leaf.cmu.edu) datasets with some postprocessing to make them more uniform for loading in Python. Unzip and place in the base directory of the repo.
+We use the [LEAF](https://leaf.cmu.edu) datasets, and we use the following command from their toolkit for generating the data: ```./preprocess.sh -s niid --sf 1.0 -k 0 --tf 0.8 -t sample```.
 
 ### FEMNIST
 - **Task**: Handwritten character recognition (62 classes)
@@ -165,14 +165,14 @@ strategicfl/
 
 ## Acknowledgements
 
-We thank the authors of [LEAF](https://leaf.cmu.edu). We acknowledge using [Claude](https://claude.ai) during development.
+We thank the authors of [LEAF](https://leaf.cmu.edu) for their work in providing the datasets. We acknowledge using [Claude](https://claude.ai) during development.
 
 ## Citation
 
 If you found this helpful and used this framework in your research, please use the following citation:
 
 ```bibtex
-@misc{chakarov2025incentivizingtruthfulcollaborationheterogeneous,
+@misc{chakarov2025incentivizing,
       title={Incentive-Compatible Collaboration in Heterogeneous Federated Learning},
       author={Dimitar Chakarov and Nikita Tsoy and Kristian Minchev and Nikola Konstantinov},
       year={2025},

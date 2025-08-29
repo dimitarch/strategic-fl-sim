@@ -16,7 +16,7 @@ def create_scalar_action(alpha, beta):
     return action
 
 
-def create_byzantine_action(strength: float = 10.0):
+def create_sign_flip_action(strength: float = 1.0):
     def action(gradient):
         return -strength * gradient
 
