@@ -43,9 +43,6 @@ if __name__ == "__main__":
     if args.config is None:
         print("Using default config! May break functionality!")
     config = load_config(args.config)
-    config.training.T = 2000
-    config.training.local_steps = 2
-    config.clients.n_players = 3
 
     # Make sure that the destination folders for results exist
     make_dir("./results")

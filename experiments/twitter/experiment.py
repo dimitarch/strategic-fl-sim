@@ -52,8 +52,6 @@ if __name__ == "__main__":
         print("Using default config! May break functionality!")
 
     config = load_config(args.config)
-    config.training.T = 10
-    config.clients.n_players = 5
 
     # Make sure that the destination folders for results exist
     make_dir("./results")
