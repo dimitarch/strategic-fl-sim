@@ -88,9 +88,9 @@ class Client(BaseClient):
             self.train_iterator = iter(self.train_dataloader)
             inputs, labels = next(self.train_iterator)
 
-        initial_model = copy.deepcopy(self.model)
-
         if self.local_steps > 1:  # Multi-step local training
+            initial_model = copy.deepcopy(self.model)
+
             for _ in range(self.local_steps):
                 loss = self.update(inputs, labels)
 
@@ -100,6 +100,9 @@ class Client(BaseClient):
             ):
                 if local_param.requires_grad:
                     grad.append((server_param - local_param).detach().clone())
+
+            # Delete copied initial model manually
+            del initial_model
         else:  # Single step case
             outputs = self.model(inputs.to(self.device))
             loss = self.criterion(outputs, labels.to(self.device))
@@ -113,7 +116,13 @@ class Client(BaseClient):
 
         # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
-        return sent_grad, loss
+
+        # Clear cache to handle big models and little memory
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        client_loss = loss.detach().cpu().item()
+        return sent_grad, client_loss
 
     def evaluate(
         self, inputs: torch.Tensor, labels: torch.Tensor

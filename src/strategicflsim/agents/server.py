@@ -70,9 +70,8 @@ class Server(BaseServer):
 
             for client in selected_clients:
                 gradient, loss = client.local_train()
-                client_loss = loss.detach().cpu().item()
                 client_gradients.append(gradient)
-                round_losses.append(client_loss)
+                round_losses.append(loss)
 
             self.update(client_gradients)
 
