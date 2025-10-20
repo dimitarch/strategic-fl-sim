@@ -66,17 +66,21 @@ class Server(BaseServer):
             self.broadcast_model(selected_clients)
 
             client_gradients = []
+            client_num_samples = []
             round_losses = []
 
             for client in selected_clients:
-                gradient, loss = client.local_train()
+                gradient, loss, num_samples = client.local_train()
                 client_gradients.append(gradient)
+                client_num_samples.append(num_samples)
                 round_losses.append(loss)
 
             self.update(client_gradients)
 
             if get_metrics is not None:
-                aggregated_gradient = self.aggregate(client_gradients)
+                aggregated_gradient = self.aggregate(
+                    client_gradients, client_num_samples
+                )
                 metrics_global.append(
                     get_metrics(client_gradients, aggregated_gradient)
                 )

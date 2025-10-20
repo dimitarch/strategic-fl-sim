@@ -169,12 +169,14 @@ class Client(BaseClient):
         # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
 
+        client_loss = loss.detach().cpu().item()
+        num_samples = len(labels)
+
         # Clear cache to handle big models and little memory
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        client_loss = loss.detach().cpu().item()
-        return sent_grad, client_loss
+        return sent_grad, client_loss, num_samples
 
     def predict(self, inputs: torch.Tensor) -> torch.Tensor:
         """Generate predictions with temporary eval mode."""
