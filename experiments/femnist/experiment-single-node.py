@@ -22,13 +22,9 @@ from utils.io import generate_save_name, make_dir
 
 def get_data(path: str):
     """Load data from JSON file."""
-    data = {}
-    user_names = []
-
     with open(path, "r") as f:
         data = json.load(f)
         user_names = list(data.keys())
-
     return data, user_names
 
 
@@ -48,7 +44,7 @@ if __name__ == "__main__":
     make_dir("./results")
     make_dir(config.experiment.save_dir)
 
-    torch.backends.cudnn.benchmark = True  # cuDNN optimization
+    torch.backends.cudnn.benchmark = True
 
     print("Using configuration:")
     print(OmegaConf.to_yaml(config, resolve=True))
@@ -70,9 +66,7 @@ if __name__ == "__main__":
     print("Compiling server model...")
 
     if device.type == "cuda":
-        server_model = torch.compile(
-            server_model, mode="reduce-overhead"
-        )  # maybe not on apple silicon :(
+        server_model = torch.compile(server_model, mode="reduce-overhead")
 
     server = Server(
         device=device,
@@ -83,65 +77,81 @@ if __name__ == "__main__":
     )
     print(f"Created {server}")
 
-    # Create list of clients, last is "misreporting" and others are truthful
-    print("Creating client array...")
+    # Prepare data splits for all clients
+    print("Preparing client data splits...")
     split_index = len(user_names) // config.clients.n_players
 
-    clients = []
+    data_splits = []
+    agent_ids = []
+
     for i in range(config.clients.n_players):
         # Get the range of users for this client group
         start_idx = max(0, i * split_index)
         end_idx = min((i + 1) * split_index, len(user_names))
+        if i == config.clients.n_players - 1:
+            end_idx = len(user_names)  # Last client gets remaining users
+
         client_user_names = user_names[start_idx:end_idx]
 
-        # Determine client type (good vs bad) - last group is adversarial
-        if i == config.clients.n_players - 1:
-            alpha = config.clients.alpha_1
-            beta = config.clients.beta_1
-        else:
-            alpha = config.clients.alpha_0
-            beta = config.clients.beta_0
-
+        # Create datasets
         train_dataset = FEMNISTDataset(client_user_names, data_dict)
         test_dataset = FEMNISTDataset(client_user_names, test_data_dict)
 
         train_dataloader = DataLoader(
             train_dataset,
             batch_size=config.training.get("batch_size", 32),
-            shuffle=False,
-            # num_workers=2,
+            shuffle=True,
             pin_memory=True if device.type == "cuda" else False,
-            # persistent_workers=True,
         )
 
         test_dataloader = DataLoader(
             test_dataset,
             batch_size=config.training.get("eval_batch_size", 128),
             shuffle=False,
-            # num_workers=2,
             pin_memory=True if device.type == "cuda" else False,
-            # persistent_workers=True,
         )
 
-        # Create client
-        client_model = CNN().to(device)  # Create local model
+        data_splits.append((train_dataloader, test_dataloader))
 
-        if device.type == "cuda":
-            client_model = torch.compile(client_model, mode="reduce-overhead")
+        # Determine agent ID
+        if i == config.clients.n_players - 1:
+            agent_ids.append("bad")
+        else:
+            agent_ids.append(f"good{i}")
 
-        client = Client(
-            device=device,
-            train_dataloader=train_dataloader,
-            test_dataloader=test_dataloader,
-            model=client_model,
-            criterion=nn.CrossEntropyLoss().to(device),
-            optimizer=torch.optim.SGD(client_model.parameters(), lr=config.training.lr),
-            action=create_scalar_action(alpha, beta),
-            agent_id="bad" if i == config.clients.n_players - 1 else f"good{i}",
-        )
+    # Determine action based on last client (adversarial)
+    def get_action(idx):
+        if idx == config.clients.n_players - 1:
+            return create_scalar_action(config.clients.alpha_1, config.clients.beta_1)
+        else:
+            return create_scalar_action(config.clients.alpha_0, config.clients.beta_0)
 
-        clients.append(client)
-        print(f"Created {client}")
+    # Create all clients using factory method
+    print("Creating client array...")
+    num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
+    devices = [
+        torch.device(f"cuda:{(i + 1) % num_gpus}")
+        if torch.cuda.is_available()
+        else device
+        for i in range(config.clients.n_players)
+    ]
+
+    clients = Client.create_clients(
+        n_clients=config.clients.n_players,
+        devices=devices,
+        data_splits=data_splits,
+        model_fn=lambda: CNN(),
+        criterion_fn=lambda: nn.CrossEntropyLoss(),
+        optimizer_fn=lambda params: torch.optim.SGD(params, lr=config.training.lr),
+        action_fn=lambda idx: get_action(idx),
+        local_steps=config.training.get("local_steps", 1),
+        agent_ids=agent_ids,
+    )
+
+    # Optionally compile client models
+    if device.type == "cuda":
+        for client in clients:
+            client.model = torch.compile(client.model, mode="reduce-overhead")
 
     # Train
     print("Starting training...")
@@ -152,12 +162,12 @@ if __name__ == "__main__":
     )
     print("Training finished!")
 
-    # Prepare test data and evaluate
+    # Evaluate
     print("Starting evaluation...")
     final_accuracy, final_loss = evaluate_with_ids(server, clients)
     print("Evaluation finished!")
 
-    # Convert metrics to numpy arrays for compatibility
+    # Convert metrics to numpy arrays
     losses_array = np.array(
         [[loss for loss in round_losses] for round_losses in all_losses]
     )
@@ -174,7 +184,7 @@ if __name__ == "__main__":
         "beta_0": config.clients.beta_0,
         "beta_1": config.clients.beta_1,
         "T": config.training.T,
-        "local_steps": config.training.local_steps,
+        "local_steps": config.training.get("local_steps", 1),
         "train_gradsizes_per_step": grad_norms_array,
         "train_cosine_per_step": cosine_sims_array,
         "train_losses_per_step": losses_array,

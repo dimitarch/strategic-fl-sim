@@ -1,5 +1,5 @@
 import copy
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import torch
 from torch import nn
@@ -51,6 +51,57 @@ class Client(BaseClient):
         self.train_iterator = iter(train_dataloader)
         self.action = action
         self.local_steps = local_steps
+
+    @classmethod
+    def create_clients(
+        cls,
+        n_clients: int,
+        devices: List[torch.device],
+        data_splits: List[Tuple],
+        model_fn: Callable,
+        criterion_fn: Callable,
+        optimizer_fn: Callable,
+        action_fn: Callable,
+        local_steps: int = 1,
+        agent_ids: Optional[List[str]] = None,
+    ) -> List["Client"]:
+        """
+        Factory method to create multiple clients with the same strategic action on a list of devices. Each client gets their own data, model, optimizer, criterion
+        """
+        clients = []
+
+        for i in range(n_clients):
+            # Cycle through devices if fewer devices than clients
+            device = devices[i % len(devices)]
+            train_loader, test_loader = data_splits[i]
+
+            model = model_fn().to(device)
+
+            criterion = criterion_fn()
+            if hasattr(criterion, "to"):
+                criterion = criterion.to(device)
+
+            optimizer = optimizer_fn(model.parameters())
+
+            # Get agent_id (handle missing agent ids harmlessly)
+            agent_id = agent_ids[i] if agent_ids else f"client_{i}"
+
+            client = cls(
+                device=device,
+                train_dataloader=train_loader,
+                test_dataloader=test_loader,
+                model=model,
+                criterion=criterion,
+                optimizer=optimizer,
+                action=action_fn,
+                local_steps=local_steps,
+                agent_id=agent_id,
+            )
+
+            clients.append(client)
+            print(f"Created {agent_id} on {device}")
+
+        return clients
 
     def apply_action(self, gradient):
         """Apply configured strategic action to gradient."""
@@ -124,6 +175,21 @@ class Client(BaseClient):
         client_loss = loss.detach().cpu().item()
         return sent_grad, client_loss
 
+    def predict(self, inputs: torch.Tensor) -> torch.Tensor:
+        """Generate predictions with temporary eval mode."""
+        was_training = self.model.training
+        self.model.eval()
+
+        with torch.no_grad():
+            inputs = inputs.to(self.device)
+            outputs = self.model(inputs)
+            _, predictions = torch.max(outputs, 1)
+
+        if was_training:
+            self.model.train()
+
+        return predictions
+
     def evaluate(
         self, inputs: torch.Tensor, labels: torch.Tensor
     ) -> Tuple[float, float]:
@@ -141,47 +207,56 @@ class Client(BaseClient):
 
         if was_training:
             self.model.train()
+
         return accuracy, loss
 
-    def predict(self, inputs: torch.Tensor) -> torch.Tensor:
-        """Generate predictions with temporary eval mode."""
-        was_training = self.model.training
-        self.model.eval()
-
-        with torch.no_grad():
-            inputs = inputs.to(self.device)
-            outputs = self.model(inputs)
-            _, predictions = torch.max(outputs, 1)
-
-        if was_training:
-            self.model.train()
-        return predictions
-
-    def evaluate_on_test_set(self):
+    def evaluate_on_test_set(self) -> Tuple[float, float]:
         """Evaluate on entire test set with batched processing."""
-        was_training = self.model.training
-        self.model.eval()
-
         total_loss = 0.0
-        total_correct = 0
+        total_correct = 0.0
         total_samples = 0
 
-        with torch.no_grad():
-            for inputs, labels in self.test_dataloader:
-                inputs = inputs.to(self.device)
-                labels = labels.to(self.device)
+        for inputs, labels in self.test_dataloader:
+            batch_size = labels.size(0)
 
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+            accuracy, loss = self.evaluate(inputs, labels)
 
-                total_loss += loss.item() * inputs.size(0)
-                _, predicted = torch.max(outputs, 1)
-                total_correct += (predicted == labels).sum().item()
-                total_samples += labels.size(0)
+            # Accumulate metrics
+            total_correct += accuracy * batch_size
+            total_loss += loss * batch_size
+            total_samples += batch_size
 
-        if was_training:
-            self.model.train()
+        # Compute weighted averages
+        avg_accuracy = total_correct / total_samples if total_samples > 0 else 0.0
+        avg_loss = total_loss / total_samples if total_samples > 0 else 0.0
 
-        avg_loss = total_loss / total_samples
-        accuracy = total_correct / total_samples
-        return accuracy, avg_loss
+        return avg_accuracy, avg_loss
+
+    # def evaluate_on_test_set(self):
+    #     """Evaluate on entire test set with batched processing."""
+    #     was_training = self.model.training
+    #     self.model.eval()
+
+    #     total_loss = 0.0
+    #     total_correct = 0
+    #     total_samples = 0
+
+    #     with torch.no_grad():
+    #         for inputs, labels in self.test_dataloader:
+    #             inputs = inputs.to(self.device)
+    #             labels = labels.to(self.device)
+
+    #             outputs = self.model(inputs)
+    #             loss = self.criterion(outputs, labels)
+
+    #             total_loss += loss.item() * inputs.size(0)
+    #             _, predicted = torch.max(outputs, 1)
+    #             total_correct += (predicted == labels).sum().item()
+    #             total_samples += labels.size(0)
+
+    #     if was_training:
+    #         self.model.train()
+
+    #     avg_loss = total_loss / total_samples
+    #     accuracy = total_correct / total_samples
+    #     return accuracy, avg_loss
