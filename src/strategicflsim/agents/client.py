@@ -100,7 +100,7 @@ class Client(BaseClient):
             )
 
             clients.append(client)
-            print(f"Created {agent_id} on {device}")
+            print(f"Created {client} with {agent_id} on {device}")
 
         return clients
 

@@ -67,9 +67,10 @@ if __name__ == "__main__":
     # Create the server agent
     print("Creating server agent...")
     server_model = CNN().to(device)
-    print("Compiling server model...")
 
     if device.type == "cuda":
+        print("Compiling server model...")
+
         server_model = torch.compile(
             server_model, mode="reduce-overhead"
         )  # maybe not on apple silicon :(

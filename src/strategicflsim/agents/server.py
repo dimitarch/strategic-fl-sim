@@ -103,9 +103,13 @@ class Server(BaseServer):
         n_selected = max(1, int(len(clients) * fraction))
         return random.sample(clients, n_selected)
 
-    def aggregate(self, gradients: List[List[torch.Tensor]]) -> List[torch.Tensor]:
+    def aggregate(
+        self,
+        gradients: List[List[torch.Tensor]],
+        sizes: Optional[List[int]] = None,
+    ) -> List[torch.Tensor]:
         """Apply configured aggregation function to client gradients."""
-        return self.aggregate_fn(gradients)
+        return self.aggregate_fn(gradients, sizes)
 
     def broadcast_model(self, clients: List[BaseClient]) -> None:
         """Send only trainable parameters to minimize communication overhead."""

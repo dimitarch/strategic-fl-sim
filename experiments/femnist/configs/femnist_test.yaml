@@ -7,7 +7,7 @@ experiment:
 training:
   T: 50                      # Number of training rounds
   lr: 0.06                   # Learning rate
-  local_steps: 1             # Number of local steps per round
+  local_steps: 3             # Number of local steps per round
   batch_size: 32          # For Shakespeare
   eval_batch_size: 128    # For Shakespeare
 
