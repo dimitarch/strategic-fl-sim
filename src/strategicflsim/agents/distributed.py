@@ -44,7 +44,7 @@ class DistributedServer(Server):
 
     def broadcast_model(self) -> None:
         """Broadcast trainable parameters to all client processes."""
-        for param in self.trainable_params:
+        for param in [p for p in self.model.parameters() if p.requires_grad]:
             dist.broadcast(param.data, src=0)
 
     def gather_gradients(self, num_clients: int) -> List[List[torch.Tensor]]:
@@ -60,7 +60,7 @@ class DistributedServer(Server):
         client_gradients = [[] for _ in range(num_clients)]
 
         # Gather each layer's gradient separately
-        for param in self.trainable_params:
+        for param in [p for p in self.model.parameters() if p.requires_grad]:
             # Prepare buffers: [server_dummy, client1, client2, ...]
             gathered_tensors = [
                 torch.zeros_like(param.data) for _ in range(num_clients + 1)
