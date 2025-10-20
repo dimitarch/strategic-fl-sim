@@ -42,7 +42,6 @@ class Server(BaseServer):
         self.optimizer = optimizer
         self.aggregate_fn = aggregate_fn
         self.agent_id = agent_id
-        self.trainable_params = [p for p in self.model.parameters() if p.requires_grad]
 
     def train(
         self,
@@ -70,16 +69,20 @@ class Server(BaseServer):
 
             for client in selected_clients:
                 gradient, loss, num_samples = client.local_train()
+                gradient = [
+                    g.to(self.device) for g in gradient
+                ]  # Move to Server device
+
+                # Append gradients, number of samples and loss
                 client_gradients.append(gradient)
                 client_num_samples.append(num_samples)
                 round_losses.append(loss)
 
-            self.update(client_gradients)
+            aggregated_gradient = self.aggregate(client_gradients, client_num_samples)
+
+            self.update(aggregated_gradient)
 
             if get_metrics is not None:
-                aggregated_gradient = self.aggregate(
-                    client_gradients, client_num_samples
-                )
                 metrics_global.append(
                     get_metrics(client_gradients, aggregated_gradient)
                 )
@@ -121,16 +124,13 @@ class Server(BaseServer):
         for client in clients:
             client.receive_global_model(trainable_state)
 
-    def reset_trainable_parameters(self) -> None:
-        """Update parameter list after requires_grad changes."""
-        self.trainable_params = [p for p in self.model.parameters() if p.requires_grad]
-
-    def update(self, gradients: List[List[torch.Tensor]]) -> None:
+    def update(self, aggregated_gradient: List[torch.Tensor]) -> None:
         """Update global model with aggregated client gradients."""
-        aggregated_gradient = self.aggregate(gradients)
         self.optimizer.zero_grad()
 
-        for param, grad in zip(self.trainable_params, aggregated_gradient):
+        for param, grad in zip(
+            [p for p in self.model.parameters() if p.requires_grad], aggregated_gradient
+        ):
             param.grad = grad
 
         self.optimizer.step()

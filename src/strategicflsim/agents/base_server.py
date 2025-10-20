@@ -99,8 +99,3 @@ class BaseServer(ABC):
             Tuple of (losses_per_round, metrics_per_round)
         """
         pass
-
-    @abstractmethod
-    def reset_trainable_parameters(self) -> None:
-        """Reset the list of trainable parameters."""
-        pass
