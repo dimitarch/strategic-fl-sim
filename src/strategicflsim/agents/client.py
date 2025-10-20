@@ -1,4 +1,3 @@
-import copy
 from typing import Callable, List, Optional, Tuple
 
 import torch
@@ -140,20 +139,23 @@ class Client(BaseClient):
             inputs, labels = next(self.train_iterator)
 
         if self.local_steps > 1:  # Multi-step local training
-            initial_model = copy.deepcopy(self.model)
+            # initial_model = copy.deepcopy(self.model)
+            initial_params = [
+                p.detach().clone() for p in self.model.parameters() if p.requires_grad
+            ]  # Save only trainable parameters from initial model
 
             for _ in range(self.local_steps):
                 loss = self.update(inputs, labels)
 
             grad = []
-            for local_param, server_param in zip(
-                self.model.parameters(), initial_model.parameters()
+            for local_param, initial_param in zip(
+                self.model.parameters(), initial_params
             ):
                 if local_param.requires_grad:
-                    grad.append((server_param - local_param).detach().clone())
+                    grad.append((initial_param - local_param).detach().clone())
 
             # Delete copied initial model manually
-            del initial_model
+            del initial_params
         else:  # Single step case
             outputs = self.model(inputs.to(self.device))
             loss = self.criterion(outputs, labels.to(self.device))
@@ -167,6 +169,9 @@ class Client(BaseClient):
 
         # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
+
+        # Move to CPU to simulate communication between clients and server (i.e. the gradient is no longer on the client's device)
+        sent_grad = [g.cpu() for g in sent_grad]
 
         client_loss = loss.detach().cpu().item()
         num_samples = len(labels)
@@ -233,32 +238,3 @@ class Client(BaseClient):
         avg_loss = total_loss / total_samples if total_samples > 0 else 0.0
 
         return avg_accuracy, avg_loss
-
-    # def evaluate_on_test_set(self):
-    #     """Evaluate on entire test set with batched processing."""
-    #     was_training = self.model.training
-    #     self.model.eval()
-
-    #     total_loss = 0.0
-    #     total_correct = 0
-    #     total_samples = 0
-
-    #     with torch.no_grad():
-    #         for inputs, labels in self.test_dataloader:
-    #             inputs = inputs.to(self.device)
-    #             labels = labels.to(self.device)
-
-    #             outputs = self.model(inputs)
-    #             loss = self.criterion(outputs, labels)
-
-    #             total_loss += loss.item() * inputs.size(0)
-    #             _, predicted = torch.max(outputs, 1)
-    #             total_correct += (predicted == labels).sum().item()
-    #             total_samples += labels.size(0)
-
-    #     if was_training:
-    #         self.model.train()
-
-    #     avg_loss = total_loss / total_samples
-    #     accuracy = total_correct / total_samples
-    #     return accuracy, avg_loss
