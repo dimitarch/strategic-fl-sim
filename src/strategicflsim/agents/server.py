@@ -11,10 +11,9 @@ from .base_server import BaseServer
 
 class Server(BaseServer):
     """
-    Standard federated learning server with configurable gradient aggregation.
+    Federated learning server with configurable gradient aggregation.
 
-    Coordinates training across multiple clients using selectable aggregation methods
-    for robustness against strategic client behavior.
+    Coordinates training across multiple clients using a selected aggregation methods.
     """
 
     def __init__(

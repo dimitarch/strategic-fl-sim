@@ -9,10 +9,9 @@ from .base_client import BaseClient
 
 class Client(BaseClient):
     """
-    Standard federated learning client with strategic gradient manipulation.
+    Federated learning client with strategic gradient manipulation.
 
-    Supports multi-step local training and applies configurable strategic actions
-    to gradients before sending them to the server.
+    Supports multi-step local training and applies configurable strategic actions to gradients before sending them to the server.
     """
 
     def __init__(
