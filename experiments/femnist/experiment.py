@@ -142,7 +142,7 @@ if __name__ == "__main__":
         )
 
         clients.append(client)
-        print(f"Created {client}")
+        print(f"Created {client} with id {client.agent_id} on {client.device}")
 
     # Train
     print("Starting training...")
