@@ -66,12 +66,12 @@ class Client(BaseClient):
         agent_ids: Optional[List[str]] = None,
     ) -> List["Client"]:
         """
-        Factory method to create multiple clients with the same strategic action on a list of devices. Each client gets their own data, model, optimizer, criterion
+        Factory method to create multiple clients with different configurations. Passes an action function that returns the specific action according to the client index
         """
         clients = []
 
         for i in range(n_clients):
-            # Cycle through devices if fewer devices than clients
+            # Cycle through devices if we have fewer devices than clients
             device = devices[i % len(devices)]
             train_loader, test_loader = data_splits[i]
 
@@ -83,9 +83,10 @@ class Client(BaseClient):
 
             optimizer = optimizer_fn(model.parameters())
 
-            # Get agent_id (handle missing agent ids harmlessly)
+            # Get agent_id, while handling missing data
             agent_id = agent_ids[i] if agent_ids else f"client_{i}"
 
+            # Create client
             client = cls(
                 device=device,
                 train_dataloader=train_loader,
@@ -93,7 +94,7 @@ class Client(BaseClient):
                 model=model,
                 criterion=criterion,
                 optimizer=optimizer,
-                action=action_fn,
+                action=action_fn(i),
                 local_steps=local_steps,
                 agent_id=agent_id,
             )

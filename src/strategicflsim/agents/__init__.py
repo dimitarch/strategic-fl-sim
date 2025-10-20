@@ -3,4 +3,11 @@ from .base_server import BaseServer
 from .client import Client
 from .server import Server
 
-__all__ = ["BaseServer", "BaseClient", "Server", "Client"]
+__all__ = [
+    "BaseServer",
+    "BaseClient",
+    "Server",
+    "Client",
+    "DistributedClient",
+    "DistributedServer",
+]

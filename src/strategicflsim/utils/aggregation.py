@@ -27,7 +27,7 @@ def weighted_average_aggregate(gradients, sizes):
     return aggregated
 
 
-def median_aggregate(gradients, sizes):
+def median_aggregate(gradients):
     """Aggregate gradients using coordinate-wise median aggregation."""
     aggregated = []
 
