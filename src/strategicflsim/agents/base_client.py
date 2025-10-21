@@ -57,7 +57,7 @@ class BaseClient(ABC):
         pass
 
     @abstractmethod
-    def local_train(self) -> Tuple[List[torch.Tensor], torch.Tensor]:
+    def local_train(self) -> Tuple[List[torch.Tensor], float, int]:
         """Perform local training and return gradients and loss.
 
         Returns:

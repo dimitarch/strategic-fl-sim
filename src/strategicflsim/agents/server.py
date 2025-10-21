@@ -48,16 +48,16 @@ class Server(BaseServer):
         clients: List[BaseClient],
         T: int = 1000,
         client_fraction: float = 1.0,
-        get_metrics: Optional[Any] = None,
+        metrics: Optional[Any] = None,
     ) -> Tuple[List[List[float]], Optional[List[dict]]]:
         """
         Execute federated learning protocol with progress tracking.
 
-        Implements: client selection → model broadcast → local training →
-        gradient aggregation → global update cycle.
+        Implements: client selection -> model broadcast -> local training ->
+        gradient aggregation -> global update cycle.
         """
         losses_global = []
-        metrics_global = []
+        # metrics_global = []
 
         for _ in tqdm(range(T), total=T, desc="Federated Training"):
             selected_clients = self.select_clients(clients, fraction=client_fraction)
@@ -82,17 +82,18 @@ class Server(BaseServer):
 
             self.update(aggregated_gradient)
 
-            if get_metrics is not None:
-                metrics_global.append(
-                    get_metrics(client_gradients, aggregated_gradient)
-                )
+            if metrics is not None:
+                metrics(round_losses, client_gradients, aggregated_gradient)
+                # metrics_global.append(
+                #     get_metrics(client_gradients, aggregated_gradient)
+                # )
 
             losses_global.append(round_losses)
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        return losses_global, metrics_global
+        return losses_global  # , metrics_global
 
     def select_clients(
         self,
@@ -170,8 +171,8 @@ class Server(BaseServer):
             self.model.train()
         return predictions
 
-    def __str__(self):
-        return f"Server(id={self.agent_id})"
+    # def __str__(self):
+    #     return f"Server(id={self.agent_id})"
 
-    def __repr__(self):
-        return self.__str__()
+    # def __repr__(self):
+    #     return self.__str__()

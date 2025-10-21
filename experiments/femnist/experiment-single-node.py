@@ -2,7 +2,6 @@ import argparse
 import json
 import pickle
 
-import numpy as np
 import torch
 from femnistdataloader import FEMNISTDataset
 from omegaconf import OmegaConf
@@ -14,7 +13,7 @@ from strategicflsim.agents import Client, Server
 from strategicflsim.utils.actions import create_scalar_action
 from strategicflsim.utils.aggregation import get_aggregate
 from strategicflsim.utils.evaluate import evaluate_with_ids
-from strategicflsim.utils.metrics import get_gradient_metrics
+from strategicflsim.utils.metrics import Metrics
 from utils.config import load_config, save_config
 from utils.device import get_device
 from utils.io import generate_save_name, make_dir
@@ -63,19 +62,24 @@ if __name__ == "__main__":
     # Create the server agent
     print("Creating server agent...")
     server_model = CNN().to(device)
-    print("Compiling server model...")
 
     if device.type == "cuda":
-        server_model = torch.compile(server_model, mode="reduce-overhead")
+        print("Compiling server model...")
+
+        server_model = torch.compile(
+            server_model, mode="reduce-overhead"
+        )  # maybe not on apple silicon :(
 
     server = Server(
         device=device,
         model=server_model,
         criterion=nn.CrossEntropyLoss().to(device),
-        optimizer=torch.optim.SGD(server_model.parameters(), lr=config.training.lr),
+        optimizer=torch.optim.SGD(
+            server_model.parameters(), lr=config.training.lr, foreach=True
+        ),
         aggregate_fn=get_aggregate(method=config.aggregation.method),
     )
-    print(f"Created {server}")
+    print(f"Created {server} with id {server.agent_id} on {server.device}")
 
     # Prepare data splits for all clients
     print("Preparing client data splits...")
@@ -126,8 +130,7 @@ if __name__ == "__main__":
         else:
             return create_scalar_action(config.clients.alpha_0, config.clients.beta_0)
 
-    # Create all clients using factory method
-    print("Creating client array...")
+    # ! Identify available GPUs on this node. This is the only difference with the single-gpu experiment in experiment.py
     num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
     devices = [
         torch.device(f"cuda:{(i + 1) % num_gpus}")
@@ -135,14 +138,19 @@ if __name__ == "__main__":
         else device
         for i in range(config.clients.n_players)
     ]
+    # ! End of device initialization
 
+    # Create all clients using factory method
+    print("Creating client array...")
     clients = Client.create_clients(
         n_clients=config.clients.n_players,
         devices=devices,
         data_splits=data_splits,
         model_fn=lambda: CNN(),
         criterion_fn=lambda: nn.CrossEntropyLoss(),
-        optimizer_fn=lambda params: torch.optim.SGD(params, lr=config.training.lr),
+        optimizer_fn=lambda params: torch.optim.SGD(
+            params, lr=config.training.lr, foreach=True
+        ),
         action_fn=lambda idx: get_action(idx),
         local_steps=config.training.get("local_steps", 1),
         agent_ids=agent_ids,
@@ -153,12 +161,18 @@ if __name__ == "__main__":
         for client in clients:
             client.model = torch.compile(client.model, mode="reduce-overhead")
 
+    # Generate save name
+    save_name = generate_save_name(config)
+
     # Train
     print("Starting training...")
-    all_losses, all_metrics = server.train(
+    server.train(
         clients=clients,
         T=config.training.T,
-        get_metrics=get_gradient_metrics,
+        metrics=Metrics(
+            save_path=save_name,
+            client_ids=[client.agent_id for client in clients],
+        ),
     )
     print("Training finished!")
 
@@ -167,15 +181,7 @@ if __name__ == "__main__":
     final_accuracy, final_loss = evaluate_with_ids(server, clients)
     print("Evaluation finished!")
 
-    # Convert metrics to numpy arrays
-    losses_array = np.array(
-        [[loss for loss in round_losses] for round_losses in all_losses]
-    )
-    grad_norms_array = np.array([metrics["grad_norms"] for metrics in all_metrics])
-    cosine_sims_array = np.array(
-        [metrics["cosine_similarities"] for metrics in all_metrics]
-    )
-
+    # Training metrics already saved to CSV
     results = {
         "config": OmegaConf.to_container(config, resolve=True),
         "n_players": config.clients.n_players,
@@ -185,15 +191,9 @@ if __name__ == "__main__":
         "beta_1": config.clients.beta_1,
         "T": config.training.T,
         "local_steps": config.training.get("local_steps", 1),
-        "train_gradsizes_per_step": grad_norms_array,
-        "train_cosine_per_step": cosine_sims_array,
-        "train_losses_per_step": losses_array,
         "test_accuracy": final_accuracy,
         "test_losses": final_loss,
     }
-
-    # Generate save name
-    save_name = generate_save_name(config)
 
     # Save results
     with open(f"{save_name}.pkl", "wb") as f:

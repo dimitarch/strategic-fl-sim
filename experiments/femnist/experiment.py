@@ -2,7 +2,6 @@ import argparse
 import json
 import pickle
 
-import numpy as np
 import torch
 from femnistdataloader import FEMNISTDataset
 from omegaconf import OmegaConf
@@ -14,25 +13,14 @@ from strategicflsim.agents import Client, Server
 from strategicflsim.utils.actions import create_scalar_action
 from strategicflsim.utils.aggregation import get_aggregate
 from strategicflsim.utils.evaluate import evaluate_with_ids
-from strategicflsim.utils.metrics import get_gradient_metrics
+from strategicflsim.utils.metrics import Metrics
 from utils.config import load_config, save_config
 from utils.device import get_device
 from utils.io import generate_save_name, make_dir
 
-# def set_seed(seed=42):
-#     torch.manual_seed(seed)
-#     torch.cuda.manual_seed_all(seed)
-#     np.random.seed(seed)
-#     random.seed(seed)
-#     torch.backends.cudnn.deterministic = False
-#     torch.backends.cudnn.benchmark = True
-
 
 def get_data(path: str):
     """Load data from JSON file."""
-    data = {}
-    user_names = []
-
     with open(path, "r") as f:
         data = json.load(f)
         user_names = list(data.keys())
@@ -70,7 +58,6 @@ if __name__ == "__main__":
     test_data_dict, _ = get_data(config.data.test_path)
     print("Finished loading test data!")
 
-    # set_seed(42)
     device = get_device()
 
     # Create the server agent
@@ -95,25 +82,23 @@ if __name__ == "__main__":
     )
     print(f"Created {server} with id {server.agent_id} on {server.device}")
 
-    # Create list of clients, last is "misreporting" and others are truthful
-    print("Creating client array...")
+    # Prepare data splits for all clients
+    print("Preparing client data splits...")
     split_index = len(user_names) // config.clients.n_players
 
-    clients = []
+    data_splits = []
+    agent_ids = []
+
     for i in range(config.clients.n_players):
         # Get the range of users for this client group
         start_idx = max(0, i * split_index)
         end_idx = min((i + 1) * split_index, len(user_names))
+        if i == config.clients.n_players - 1:
+            end_idx = len(user_names)  # Last client gets remaining users
+
         client_user_names = user_names[start_idx:end_idx]
 
-        # Determine client type (good vs bad) - last group is adversarial
-        if i == config.clients.n_players - 1:
-            alpha = config.clients.alpha_1
-            beta = config.clients.beta_1
-        else:
-            alpha = config.clients.alpha_0
-            beta = config.clients.beta_0
-
+        # Create datasets
         train_dataset = FEMNISTDataset(client_user_names, data_dict)
         test_dataset = FEMNISTDataset(client_user_names, test_data_dict)
 
@@ -121,48 +106,64 @@ if __name__ == "__main__":
             train_dataset,
             batch_size=config.training.get("batch_size", 32),
             shuffle=False,
-            # num_workers=2,
             pin_memory=True if device.type == "cuda" else False,
-            # persistent_workers=True,
         )
 
         test_dataloader = DataLoader(
             test_dataset,
             batch_size=config.training.get("eval_batch_size", 128),
             shuffle=False,
-            # num_workers=2,
             pin_memory=True if device.type == "cuda" else False,
-            # persistent_workers=True,
         )
 
-        # Create client
-        client_model = CNN().to(device)  # Create local model
+        data_splits.append((train_dataloader, test_dataloader))
 
-        if device.type == "cuda":
-            client_model = torch.compile(client_model, mode="reduce-overhead")
+        # Determine agent ID
+        if i == config.clients.n_players - 1:
+            agent_ids.append("bad")
+        else:
+            agent_ids.append(f"good{i}")
 
-        client = Client(
-            device=device,
-            train_dataloader=train_dataloader,
-            test_dataloader=test_dataloader,
-            model=client_model,
-            criterion=nn.CrossEntropyLoss().to(device),
-            optimizer=torch.optim.SGD(
-                client_model.parameters(), lr=config.training.lr, foreach=True
-            ),
-            action=create_scalar_action(alpha, beta),
-            agent_id="bad" if i == config.clients.n_players - 1 else f"good{i}",
-        )
+    # Determine action based on last client (adversarial)
+    def get_action(idx):
+        if idx == config.clients.n_players - 1:
+            return create_scalar_action(config.clients.alpha_1, config.clients.beta_1)
+        else:
+            return create_scalar_action(config.clients.alpha_0, config.clients.beta_0)
 
-        clients.append(client)
-        print(f"Created {client} with id {client.agent_id} on {client.device}")
+    # Create all clients using factory method
+    print("Creating client array...")
+    clients = Client.create_clients(
+        n_clients=config.clients.n_players,
+        devices=[device] * config.clients.n_players,
+        data_splits=data_splits,
+        model_fn=lambda: CNN(),
+        criterion_fn=lambda: nn.CrossEntropyLoss(),
+        optimizer_fn=lambda params: torch.optim.SGD(
+            params, lr=config.training.lr, foreach=True
+        ),
+        action_fn=lambda idx: get_action(idx),
+        local_steps=config.training.get("local_steps", 1),
+        agent_ids=agent_ids,
+    )
+
+    # Optionally compile client models
+    if device.type == "cuda":
+        for client in clients:
+            client.model = torch.compile(client.model, mode="reduce-overhead")
+
+    # Generate save name
+    save_name = generate_save_name(config)
 
     # Train
     print("Starting training...")
-    all_losses, all_metrics = server.train(
+    server.train(
         clients=clients,
         T=config.training.T,
-        get_metrics=get_gradient_metrics,
+        metrics=Metrics(
+            save_path=save_name,
+            client_ids=[client.agent_id for client in clients],
+        ),
     )
     print("Training finished!")
 
@@ -170,15 +171,6 @@ if __name__ == "__main__":
     print("Starting evaluation...")
     final_accuracy, final_loss = evaluate_with_ids(server, clients)
     print("Evaluation finished!")
-
-    # Convert metrics to numpy arrays for compatibility
-    losses_array = np.array(
-        [[loss for loss in round_losses] for round_losses in all_losses]
-    )
-    grad_norms_array = np.array([metrics["grad_norms"] for metrics in all_metrics])
-    cosine_sims_array = np.array(
-        [metrics["cosine_similarities"] for metrics in all_metrics]
-    )
 
     results = {
         "config": OmegaConf.to_container(config, resolve=True),
@@ -189,15 +181,9 @@ if __name__ == "__main__":
         "beta_1": config.clients.beta_1,
         "T": config.training.T,
         "local_steps": config.training.local_steps,
-        "train_gradsizes_per_step": grad_norms_array,
-        "train_cosine_per_step": cosine_sims_array,
-        "train_losses_per_step": losses_array,
         "test_accuracy": final_accuracy,
         "test_losses": final_loss,
     }
-
-    # Generate save name
-    save_name = generate_save_name(config)
 
     # Save results
     with open(f"{save_name}.pkl", "wb") as f:

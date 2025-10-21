@@ -125,54 +125,73 @@ class Client(BaseClient):
 
         return loss
 
-    def local_train(self) -> Tuple[List[torch.Tensor], torch.Tensor]:
+    def _get_next_batch(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Get next batch from training data, cycling if necessary."""
+        try:
+            return next(self.train_iterator)
+        except StopIteration:
+            self.train_iterator = iter(self.train_dataloader)
+            return next(self.train_iterator)
+
+    def _multi_step_local_training(
+        self, inputs: torch.Tensor, labels: torch.Tensor
+    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
+        initial_params = [
+            p.detach().clone() for p in self.model.parameters() if p.requires_grad
+        ]  # Save only trainable parameters from initial model
+
+        for _ in range(self.local_steps):
+            loss = self.update(inputs, labels)
+
+        grad = []
+        for local_param, initial_param in zip(self.model.parameters(), initial_params):
+            if local_param.requires_grad:
+                grad.append((initial_param - local_param).detach())
+
+        # Delete copied initial model parameters manually
+        del initial_params
+
+        return loss, grad
+
+    def _single_step_local_training(
+        self, inputs: torch.Tensor, labels: torch.Tensor
+    ) -> tuple[torch.Tensor, list[torch.Tensor]]:
+        outputs = self.model(inputs.to(self.device))
+        loss = self.criterion(outputs, labels.to(self.device))
+        loss.backward()
+        grad = [
+            p.grad.detach().clone()
+            for p in self.model.parameters()
+            if p.requires_grad and p.grad is not None
+        ]
+        self.model.zero_grad()
+
+        return loss, grad
+
+    def local_train(self) -> Tuple[List[torch.Tensor], float, int]:
         """
         Perform local training with multi-step support.
 
         For multi-step: computes gradient as parameter difference.
         For single-step: uses direct backpropagation gradients.
         """
-        try:
-            inputs, labels = next(self.train_iterator)
-        except StopIteration:
-            self.train_iterator = iter(self.train_dataloader)
-            inputs, labels = next(self.train_iterator)
+        inputs, labels = self._get_next_batch()
+
+        # try:
+        #     inputs, labels = next(self.train_iterator)
+        # except StopIteration:
+        #     self.train_iterator = iter(self.train_dataloader)
+        #     inputs, labels = next(self.train_iterator)
 
         if self.local_steps > 1:  # Multi-step local training
-            initial_params = [
-                p.detach().clone() for p in self.model.parameters() if p.requires_grad
-            ]  # Save only trainable parameters from initial model
-
-            for _ in range(self.local_steps):
-                loss = self.update(inputs, labels)
-
-            grad = []
-            for local_param, initial_param in zip(
-                self.model.parameters(), initial_params
-            ):
-                if local_param.requires_grad:
-                    grad.append((initial_param - local_param).detach())
-
-            # Delete copied initial model parameters manually
-            del initial_params
+            loss, grad = self._multi_step_local_training(inputs, labels)
         else:  # Single step case
-            outputs = self.model(inputs.to(self.device))
-            loss = self.criterion(outputs, labels.to(self.device))
-            loss.backward()
-            grad = [
-                p.grad.detach().clone()
-                for p in self.model.parameters()
-                if p.requires_grad and p.grad is not None
-            ]
-            self.model.zero_grad()
+            loss, grad = self._single_step_local_training(inputs, labels)
 
         # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
 
-        client_loss = loss.detach().cpu().item()
-        num_samples = len(labels)
-
-        return sent_grad, client_loss, num_samples
+        return sent_grad, loss.detach().cpu().item(), len(labels)
 
     def predict(self, inputs: torch.Tensor) -> torch.Tensor:
         """Generate inference predictions in eval mode."""
