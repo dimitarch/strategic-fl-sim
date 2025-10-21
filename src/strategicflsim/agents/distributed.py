@@ -130,28 +130,25 @@ class DistributedServer(Server):
             f"[Server] Starting distributed training: {num_clients} clients, {T} rounds"
         )
 
-        for round_idx in tqdm(range(T), desc="Federated Training"):
-            # 1. Broadcast model to all clients
+        for _ in tqdm(range(T), desc="Federated Training"):
             self.broadcast_model()
 
-            # 2. Clients train locally (happens in parallel across processes)
+            client_gradients = self.gather_gradients(
+                num_clients
+            )  # Gather gradients from all clients
 
-            # 3. Gather gradients from all clients
-            client_gradients = self.gather_gradients(num_clients)
+            round_losses = self.gather_losses(
+                num_clients
+            )  # Gather losses from all clients
 
-            # 4. Gather losses from all clients
-            round_losses = self.gather_losses(num_clients)
+            client_num_samples = self.gather_num_samples(
+                num_clients
+            )  # Gather number of samples from all clients
 
-            # 5. Gather number of samples from all clients
-            client_num_samples = self.gather_num_samples(num_clients)
-
-            # 6. Aggregate gradients (same as single-process Server)
             aggregated_gradient = self.aggregate(client_gradients, client_num_samples)
 
-            # 7. Update global model (same as single-process Server)
             self.update(aggregated_gradient)
 
-            # 8. Compute metrics if requested
             if get_metrics is not None:
                 metrics_global.append(
                     get_metrics(client_gradients, aggregated_gradient)
@@ -260,9 +257,6 @@ class DistributedClient(Client):
 
         # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
-
-        # IMPORTANT: Keep gradients on GPU for NCCL - do NOT move to CPU
-        # (Unlike Client.local_train() which moves to CPU)
 
         client_loss = loss.detach().cpu().item()
         num_samples = len(labels)
