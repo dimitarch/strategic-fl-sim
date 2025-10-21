@@ -84,16 +84,13 @@ class Server(BaseServer):
 
             if metrics is not None:
                 metrics(round_losses, client_gradients, aggregated_gradient)
-                # metrics_global.append(
-                #     get_metrics(client_gradients, aggregated_gradient)
-                # )
 
             losses_global.append(round_losses)
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        return losses_global  # , metrics_global
+        return losses_global
 
     def select_clients(
         self,
@@ -170,9 +167,3 @@ class Server(BaseServer):
         if was_training:
             self.model.train()
         return predictions
-
-    # def __str__(self):
-    #     return f"Server(id={self.agent_id})"
-
-    # def __repr__(self):
-    #     return self.__str__()

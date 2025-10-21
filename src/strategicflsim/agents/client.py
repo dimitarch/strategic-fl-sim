@@ -177,12 +177,6 @@ class Client(BaseClient):
         """
         inputs, labels = self._get_next_batch()
 
-        # try:
-        #     inputs, labels = next(self.train_iterator)
-        # except StopIteration:
-        #     self.train_iterator = iter(self.train_dataloader)
-        #     inputs, labels = next(self.train_iterator)
-
         if self.local_steps > 1:  # Multi-step local training
             loss, grad = self._multi_step_local_training(inputs, labels)
         else:  # Single step case
