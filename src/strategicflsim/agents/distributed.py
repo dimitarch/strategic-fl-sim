@@ -213,59 +213,59 @@ class DistributedClient(Client):
         for param in [p for p in self.model.parameters() if p.requires_grad]:
             dist.broadcast(param.data, src=0)
 
-    def local_train_distributed(self) -> Tuple[List[torch.Tensor], float, int]:
-        """
-        Perform local training for distributed setting.
+    # def local_train_distributed(self) -> Tuple[List[torch.Tensor], float, int]:
+    #     """
+    #     Perform local training for distributed setting.
 
-        Similar to Client.local_train() but keeps gradients on GPU for NCCL.
+    #     Similar to Client.local_train() but keeps gradients on GPU for NCCL.
 
-        Returns:
-            Tuple of (gradient, loss, num_samples) with gradients on GPU
-        """
-        try:
-            inputs, labels = next(self.train_iterator)
-        except StopIteration:
-            self.train_iterator = iter(self.train_dataloader)
-            inputs, labels = next(self.train_iterator)
+    #     Returns:
+    #         Tuple of (gradient, loss, num_samples) with gradients on GPU
+    #     """
+    #     try:
+    #         inputs, labels = next(self.train_iterator)
+    #     except StopIteration:
+    #         self.train_iterator = iter(self.train_dataloader)
+    #         inputs, labels = next(self.train_iterator)
 
-        if self.local_steps > 1:  # Multi-step local training
-            initial_params = [
-                p.detach().clone() for p in self.model.parameters() if p.requires_grad
-            ]
+    #     if self.local_steps > 1:  # Multi-step local training
+    #         initial_params = [
+    #             p.detach().clone() for p in self.model.parameters() if p.requires_grad
+    #         ]
 
-            for _ in range(self.local_steps):
-                loss = self.update(inputs, labels)
+    #         for _ in range(self.local_steps):
+    #             loss = self.update(inputs, labels)
 
-            grad = []
-            for local_param, initial_param in zip(
-                self.model.parameters(), initial_params
-            ):
-                if local_param.requires_grad:
-                    grad.append((initial_param - local_param).detach().clone())
+    #         grad = []
+    #         for local_param, initial_param in zip(
+    #             self.model.parameters(), initial_params
+    #         ):
+    #             if local_param.requires_grad:
+    #                 grad.append((initial_param - local_param).detach().clone())
 
-            del initial_params
-        else:  # Single step case
-            outputs = self.model(inputs.to(self.device))
-            loss = self.criterion(outputs, labels.to(self.device))
-            loss.backward()
-            grad = [
-                p.grad.detach().clone()
-                for p in self.model.parameters()
-                if p.requires_grad and p.grad is not None
-            ]
-            self.model.zero_grad()
+    #         del initial_params
+    #     else:  # Single step case
+    #         outputs = self.model(inputs.to(self.device))
+    #         loss = self.criterion(outputs, labels.to(self.device))
+    #         loss.backward()
+    #         grad = [
+    #             p.grad.detach().clone()
+    #             for p in self.model.parameters()
+    #             if p.requires_grad and p.grad is not None
+    #         ]
+    #         self.model.zero_grad()
 
-        # Apply strategic action to each gradient
-        sent_grad = [self.apply_action(g) for g in grad]
+    #     # Apply strategic action to each gradient
+    #     sent_grad = [self.apply_action(g) for g in grad]
 
-        client_loss = loss.detach().cpu().item()
-        num_samples = len(labels)
+    #     client_loss = loss.detach().cpu().item()
+    #     num_samples = len(labels)
 
-        # Clear cache
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+    #     # Clear cache
+    #     if torch.cuda.is_available():
+    #         torch.cuda.empty_cache()
 
-        return sent_grad, client_loss, num_samples
+    #     return sent_grad, client_loss, num_samples
 
     def send_gradient(self, gradient: List[torch.Tensor]) -> None:
         """Send gradient to server via gather."""
@@ -303,7 +303,7 @@ class DistributedClient(Client):
             self.receive_global_model_distributed()
 
             # 2. Train locally (use distributed version that keeps grads on GPU)
-            gradient, loss, num_samples = self.local_train_distributed()
+            gradient, loss, num_samples = self.local_train()
 
             # 3. Send gradient to server
             self.send_gradient(gradient)
