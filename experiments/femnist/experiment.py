@@ -93,7 +93,7 @@ if __name__ == "__main__":
         ),
         aggregate_fn=get_aggregate(method=config.aggregation.method),
     )
-    print(f"Created {server}")
+    print(f"Created {server} with id {server.agent_id} on {server.device}")
 
     # Create list of clients, last is "misreporting" and others are truthful
     print("Creating client array...")
