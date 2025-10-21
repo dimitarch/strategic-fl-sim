@@ -88,7 +88,9 @@ if __name__ == "__main__":
         device=device,
         model=server_model,
         criterion=nn.CrossEntropyLoss().to(device),
-        optimizer=torch.optim.SGD(server_model.parameters(), lr=config.training.lr),
+        optimizer=torch.optim.SGD(
+            server_model.parameters(), lr=config.training.lr, foreach=True
+        ),
         aggregate_fn=get_aggregate(method=config.aggregation.method),
     )
     print(f"Created {server}")
@@ -145,7 +147,9 @@ if __name__ == "__main__":
             test_dataloader=test_dataloader,
             model=client_model,
             criterion=nn.CrossEntropyLoss().to(device),
-            optimizer=torch.optim.SGD(client_model.parameters(), lr=config.training.lr),
+            optimizer=torch.optim.SGD(
+                client_model.parameters(), lr=config.training.lr, foreach=True
+            ),
             action=create_scalar_action(alpha, beta),
             agent_id="bad" if i == config.clients.n_players - 1 else f"good{i}",
         )
