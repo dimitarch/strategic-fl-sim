@@ -19,6 +19,14 @@ from utils.config import load_config, save_config
 from utils.device import get_device
 from utils.io import generate_save_name, make_dir
 
+# def set_seed(seed=42):
+#     torch.manual_seed(seed)
+#     torch.cuda.manual_seed_all(seed)
+#     np.random.seed(seed)
+#     random.seed(seed)
+#     torch.backends.cudnn.deterministic = False
+#     torch.backends.cudnn.benchmark = True
+
 
 def get_data(path: str):
     """Load data from JSON file."""
@@ -62,6 +70,7 @@ if __name__ == "__main__":
     test_data_dict, _ = get_data(config.data.test_path)
     print("Finished loading test data!")
 
+    # set_seed(42)
     device = get_device()
 
     # Create the server agent

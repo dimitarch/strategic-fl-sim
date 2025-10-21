@@ -89,7 +89,8 @@ class Server(BaseServer):
 
             losses_global.append(round_losses)
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return losses_global, metrics_global
 
     def select_clients(

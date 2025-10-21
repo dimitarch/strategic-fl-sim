@@ -170,9 +170,6 @@ class Client(BaseClient):
         # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
 
-        # Move to CPU to simulate communication between clients and server (i.e. the gradient is no longer on the client's device)
-        sent_grad = [g.cpu() for g in sent_grad]
-
         client_loss = loss.detach().cpu().item()
         num_samples = len(labels)
 
@@ -183,7 +180,7 @@ class Client(BaseClient):
         return sent_grad, client_loss, num_samples
 
     def predict(self, inputs: torch.Tensor) -> torch.Tensor:
-        """Generate predictions with temporary eval mode."""
+        """Generate inference predictions in eval mode."""
         was_training = self.model.training
         self.model.eval()
 
@@ -200,7 +197,7 @@ class Client(BaseClient):
     def evaluate(
         self, inputs: torch.Tensor, labels: torch.Tensor
     ) -> Tuple[float, float]:
-        """Evaluate on batch with temporary eval mode."""
+        """Evaluate on batch in eval mode."""
         was_training = self.model.training
         self.model.eval()
 
