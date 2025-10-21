@@ -36,7 +36,7 @@ class Client(BaseClient):
             criterion: Loss function
             optimizer: Parameter optimizer
             action: Strategic action function for gradient manipulation
-            local_steps: Number of local SGD steps per round (default: 1)
+            local_steps: Number of local optimizer steps per round (default: 1)
             agent_id: Client identifier (default: "client")
         """
         self.device = device
@@ -113,7 +113,7 @@ class Client(BaseClient):
         self.model.load_state_dict(current_state)
 
     def update(self, inputs, labels) -> torch.Tensor:
-        """Perform single SGD step on given batch."""
+        """Perform single optimizer step on given batch."""
         inputs = inputs.to(self.device)
         labels = labels.to(self.device)
 
@@ -139,7 +139,6 @@ class Client(BaseClient):
             inputs, labels = next(self.train_iterator)
 
         if self.local_steps > 1:  # Multi-step local training
-            # initial_model = copy.deepcopy(self.model)
             initial_params = [
                 p.detach().clone() for p in self.model.parameters() if p.requires_grad
             ]  # Save only trainable parameters from initial model
@@ -152,9 +151,9 @@ class Client(BaseClient):
                 self.model.parameters(), initial_params
             ):
                 if local_param.requires_grad:
-                    grad.append((initial_param - local_param).detach().clone())
+                    grad.append((initial_param - local_param).detach())
 
-            # Delete copied initial model manually
+            # Delete copied initial model parameters manually
             del initial_params
         else:  # Single step case
             outputs = self.model(inputs.to(self.device))
@@ -172,10 +171,6 @@ class Client(BaseClient):
 
         client_loss = loss.detach().cpu().item()
         num_samples = len(labels)
-
-        # Clear cache to handle big models and little memory
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
 
         return sent_grad, client_loss, num_samples
 
