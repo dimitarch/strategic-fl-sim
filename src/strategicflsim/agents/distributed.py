@@ -89,6 +89,21 @@ class DistributedServer(Server):
 
         return [loss_buffer[i + 1].item() for i in range(num_clients)]
 
+    def gather_num_samples(self, num_clients: int) -> List[int]:
+        """Gather number of samples from all client processes."""
+        samples_buffer = [
+            torch.zeros(1, dtype=torch.long, device=self.device)
+            for _ in range(num_clients + 1)
+        ]
+
+        dist.gather(
+            torch.zeros(1, dtype=torch.long, device=self.device),
+            gather_list=samples_buffer,
+            dst=0,
+        )
+
+        return [int(samples_buffer[i + 1].item()) for i in range(num_clients)]
+
     def train_distributed(
         self,
         num_clients: int,
@@ -127,12 +142,17 @@ class DistributedServer(Server):
             # 4. Gather losses from all clients
             round_losses = self.gather_losses(num_clients)
 
-            # 5. Aggregate and update (same as single-process)
-            self.update(client_gradients)
+            # 5. Gather number of samples from all clients
+            client_num_samples = self.gather_num_samples(num_clients)
 
-            # 6. Compute metrics if requested
+            # 6. Aggregate gradients (same as single-process Server)
+            aggregated_gradient = self.aggregate(client_gradients, client_num_samples)
+
+            # 7. Update global model (same as single-process Server)
+            self.update(aggregated_gradient)
+
+            # 8. Compute metrics if requested
             if get_metrics is not None:
-                aggregated_gradient = self.aggregate(client_gradients)
                 metrics_global.append(
                     get_metrics(client_gradients, aggregated_gradient)
                 )
@@ -196,15 +216,82 @@ class DistributedClient(Client):
         for param in [p for p in self.model.parameters() if p.requires_grad]:
             dist.broadcast(param.data, src=0)
 
+    def local_train_distributed(self) -> Tuple[List[torch.Tensor], float, int]:
+        """
+        Perform local training for distributed setting.
+
+        Similar to Client.local_train() but keeps gradients on GPU for NCCL.
+
+        Returns:
+            Tuple of (gradient, loss, num_samples) with gradients on GPU
+        """
+        try:
+            inputs, labels = next(self.train_iterator)
+        except StopIteration:
+            self.train_iterator = iter(self.train_dataloader)
+            inputs, labels = next(self.train_iterator)
+
+        if self.local_steps > 1:  # Multi-step local training
+            initial_params = [
+                p.detach().clone() for p in self.model.parameters() if p.requires_grad
+            ]
+
+            for _ in range(self.local_steps):
+                loss = self.update(inputs, labels)
+
+            grad = []
+            for local_param, initial_param in zip(
+                self.model.parameters(), initial_params
+            ):
+                if local_param.requires_grad:
+                    grad.append((initial_param - local_param).detach().clone())
+
+            del initial_params
+        else:  # Single step case
+            outputs = self.model(inputs.to(self.device))
+            loss = self.criterion(outputs, labels.to(self.device))
+            loss.backward()
+            grad = [
+                p.grad.detach().clone()
+                for p in self.model.parameters()
+                if p.requires_grad and p.grad is not None
+            ]
+            self.model.zero_grad()
+
+        # Apply strategic action to each gradient
+        sent_grad = [self.apply_action(g) for g in grad]
+
+        # IMPORTANT: Keep gradients on GPU for NCCL - do NOT move to CPU
+        # (Unlike Client.local_train() which moves to CPU)
+
+        client_loss = loss.detach().cpu().item()
+        num_samples = len(labels)
+
+        # Clear cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        return sent_grad, client_loss, num_samples
+
     def send_gradient(self, gradient: List[torch.Tensor]) -> None:
         """Send gradient to server via gather."""
         for grad_tensor in gradient:
+            # Ensure gradient is on correct device
+            if grad_tensor.device != self.device:
+                grad_tensor = grad_tensor.to(self.device)
             dist.gather(grad_tensor, dst=0)
 
     def send_loss(self, loss: float) -> None:
         """Send loss value to server."""
         loss_tensor = torch.tensor([loss], device=self.device)
         dist.gather(loss_tensor, dst=0)
+
+    def send_num_samples(self, num_samples: int) -> None:
+        """Send number of samples to server."""
+        samples_tensor = torch.tensor(
+            [num_samples], dtype=torch.long, device=self.device
+        )
+        dist.gather(samples_tensor, dst=0)
 
     def train_distributed(self, T: int = 1000) -> None:
         """
@@ -221,8 +308,8 @@ class DistributedClient(Client):
             # 1. Receive model from server
             self.receive_global_model_distributed()
 
-            # 2. Train locally (same as single-process)
-            gradient, loss = self.local_train()
+            # 2. Train locally (use distributed version that keeps grads on GPU)
+            gradient, loss, num_samples = self.local_train_distributed()
 
             # 3. Send gradient to server
             self.send_gradient(gradient)
@@ -230,8 +317,12 @@ class DistributedClient(Client):
             # 4. Send loss to server
             self.send_loss(loss)
 
+            # 5. Send number of samples to server
+            self.send_num_samples(num_samples)
+
             # Periodic logging
             if (round_idx + 1) % 10 == 0:
                 print(
-                    f"[Client rank={rank}] Round {round_idx + 1}/{T}, Loss: {loss:.4f}"
+                    f"[Client rank={rank}] Round {round_idx + 1}/{T}, "
+                    f"Loss: {loss:.4f}, Samples: {num_samples}"
                 )
