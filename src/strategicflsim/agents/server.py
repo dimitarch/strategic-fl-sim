@@ -57,7 +57,6 @@ class Server(BaseServer):
         gradient aggregation -> global update cycle.
         """
         losses_global = []
-        # metrics_global = []
 
         for _ in tqdm(range(T), total=T, desc="Federated Training"):
             selected_clients = self.select_clients(clients, fraction=client_fraction)
