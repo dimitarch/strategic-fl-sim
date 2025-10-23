@@ -172,14 +172,13 @@ We thank the authors of [LEAF](https://leaf.cmu.edu) for their work in providing
 If you found this helpful and used this package in your research, please use the following citation:
 
 ```bibtex
-@misc{chakarov2025incentivizing,
-      title={Incentive-Compatible Collaboration in Heterogeneous Federated Learning},
-      author={Dimitar Chakarov and Nikita Tsoy and Kristian Minchev and Nikola Konstantinov},
-      year={2025},
-      eprint={2412.00980},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2412.00980},
+@inproceedings{
+    chakarov2025strategicflsim,
+    title={\${\textbackslash}texttt\{strategic-fl-sim\}\$: An Extensible Package for Simulating Strategic Behavior in Federated Learning},
+    author={Dimitar A. Chakarov and Nikola Konstantinov},
+    booktitle={NeurIPS 2025 Workshop: Reliable ML from Unreliable Data},
+    year={2025},
+    url={https://openreview.net/forum?id=JHgxY5vu9Y}
 }
 ```
 

@@ -17,14 +17,10 @@ version: "0.1.0"
 
 preferred-citation:
   type: misc
-  title: "Incentive-Compatible Collaboration in Heterogeneous Federated Learning"
+  title: "strategic-fl-sim: An Extensible Package for Simulating Strategic Behavior in Federated Learning"
   authors:
     - family-names: "Chakarov"
       given-names: "Dimitar"
-    - family-names: "Tsoy"
-      given-names: "Nikita"
-    - family-names: "Minchev"
-      given-names: "Kristian"
     - family-names: "Konstantinov"
       given-names: "Nikola"
-  url: "https://arxiv.org/abs/2412.00980"
+  url: "https://openreview.net/forum?id=JHgxY5vu9Y#discussion"
