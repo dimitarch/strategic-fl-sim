@@ -10,10 +10,10 @@ from torch.utils.data import DataLoader
 
 from models import CNN
 from strategicflsim.agents import Client, Server
-from strategicflsim.utils.actions import create_scalar_action
+from strategicflsim.utils.actions import ScalarAction
 from strategicflsim.utils.aggregation import get_aggregate
 from strategicflsim.utils.evaluate import evaluate_with_ids
-from strategicflsim.utils.metrics import Metrics
+from strategicflsim.utils.metrics import NormMetrics
 from utils.config import load_config, save_config
 from utils.device import get_device
 from utils.io import generate_save_name, make_dir
@@ -127,9 +127,9 @@ if __name__ == "__main__":
     # Determine action based on last client (adversarial)
     def get_action(idx):
         if idx == config.clients.n_players - 1:
-            return create_scalar_action(config.clients.alpha_1, config.clients.beta_1)
+            return ScalarAction(config.clients.alpha_1, config.clients.beta_1)
         else:
-            return create_scalar_action(config.clients.alpha_0, config.clients.beta_0)
+            return ScalarAction(config.clients.alpha_0, config.clients.beta_0)
 
     # Create all clients using factory method
     print("Creating client array...")
@@ -160,9 +160,10 @@ if __name__ == "__main__":
     server.train(
         clients=clients,
         T=config.training.T,
-        metrics=Metrics(
+        metrics=NormMetrics(
             save_path=save_name,
             client_ids=[client.agent_id for client in clients],
+            # test_loader=test_dataloader,
         ),
     )
     print("Training finished!")
