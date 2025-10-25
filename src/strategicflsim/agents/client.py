@@ -42,6 +42,9 @@ class Client(BaseClient):
             local_action: Strategic action function for gradient manipulation for each round in the local training
             agent_id: Client identifier (default: "client")
         """
+        if local_steps < 1:
+            raise ValueError("Number of local training steps should be >= 1")
+
         self.device = device
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader

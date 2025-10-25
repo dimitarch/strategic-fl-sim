@@ -105,6 +105,11 @@ class Server(BaseServer):
         random_seed: Optional[int] = None,
     ) -> List[BaseClient]:
         """Random sampling of clients with minimum of 1 selected."""
+        if not 0 < fraction <= 1.0:
+            raise ValueError("Fraction of selected clients must be in (0, 1]")
+        if not clients:
+            raise ValueError("List of selected clients is empty!")
+
         if random_seed is not None:
             random.seed(random_seed)
 

@@ -75,6 +75,9 @@ class ScalarAction(BaseAction):
     """
 
     def __init__(self, alpha: float = 1.0, beta: float = 0.0):
+        if beta < 0:
+            raise ValueError("Noise level (beta) must be non-negative")
+
         self.alpha = alpha
         self.beta = beta
 
@@ -271,6 +274,9 @@ class RelativeNormAction(BaseAction):
         self.relative_scale = relative_scale
         self.direction = direction
 
+        if relative_scale <= 0:
+            raise ValueError("relative_scale must be positive")
+
         if direction not in ["same", "opposite", "random"]:
             raise ValueError("direction must be 'same', 'opposite', or 'random'")
 
@@ -355,7 +361,7 @@ class ComposedAction(BaseAction):
 
     def __init__(self, actions: List[BaseAction]):
         if not actions:
-            raise ValueError("actions list cannot be empty")
+            raise ValueError("List of actions to compose cannot be empty!")
         self.actions = actions
 
     def __call__(self, gradient: torch.Tensor) -> torch.Tensor:
