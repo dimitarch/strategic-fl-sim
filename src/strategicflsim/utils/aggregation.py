@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
@@ -106,6 +107,12 @@ class WeightedAverageAggregator(BaseAggregator):
 
         # Default to equal weights if sizes not provided
         if num_samples is None:
+            warnings.warn(
+                "num_samples not provided to WeightedAverageAggregator, using equal weights",
+                UserWarning,
+                stacklevel=2,
+            )
+
             num_samples = [1] * num_clients
 
         total_size = sum(num_samples)

@@ -47,6 +47,9 @@ class RandomSelector(BaseSelector):
     """
     Uniform random sampling (standard FedAvg).
 
+    Note:
+        With small client counts, fraction is rounded up to ensure at least 1 client is selected
+
     Args:
         seed: Random seed for reproducibility (default: None)
 
