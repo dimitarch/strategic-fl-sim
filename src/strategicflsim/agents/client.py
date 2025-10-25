@@ -26,6 +26,7 @@ class Client(BaseClient):
         local_action_fn: Callable = None,
         metrics_fn: Callable = None,
         agent_id: str = "client",
+        server_device: torch.device = None,
     ):
         """
         Initialize client with model, data, and strategic behavior.
@@ -57,6 +58,7 @@ class Client(BaseClient):
         self.local_action = local_action_fn
         self.metrics = metrics_fn
         self.agent_id = agent_id
+        self.server_device = server_device if server_device is not None else device
 
     @classmethod
     def create_clients(
@@ -70,6 +72,7 @@ class Client(BaseClient):
         action_fn: Callable,
         local_steps: int = 1,
         local_action_fn: Callable = None,
+        server_device: Optional[torch.device] = None,
         agent_ids: Optional[List[str]] = None,
     ) -> List["Client"]:
         """
@@ -106,6 +109,7 @@ class Client(BaseClient):
                 local_action_fn=local_action_fn(i)
                 if local_action_fn is not None
                 else None,
+                server_device=server_device,
                 agent_id=agent_id,
             )
 
@@ -209,6 +213,9 @@ class Client(BaseClient):
             self.metrics(
                 self, inputs, labels, loss.detach().cpu().item(), grad, sent_grad
             )
+
+        if self.server_device != self.device:
+            sent_grad = [g.to(self.server_device) for g in sent_grad]
 
         return sent_grad, loss.detach().cpu().item(), len(labels)
 

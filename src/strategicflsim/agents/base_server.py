@@ -54,18 +54,18 @@ class BaseServer(ABC):
         """
         pass
 
-    @abstractmethod
-    def select_clients(self, clients: List[BaseClient], **kwargs) -> List[BaseClient]:
-        """Select subset of clients for training round.
+    # @abstractmethod
+    # def select_clients(self, clients: List[BaseClient], **kwargs) -> List[BaseClient]:
+    #     """Select subset of clients for training round.
 
-        Args:
-            clients: All available clients
-            **kwargs: Selection parameters (e.g., fraction, random_seed)
+    #     Args:
+    #         clients: All available clients
+    #         **kwargs: Selection parameters (e.g., fraction, random_seed)
 
-        Returns:
-            Selected clients for this round
-        """
-        pass
+    #     Returns:
+    #         Selected clients for this round
+    #     """
+    #     pass
 
     @abstractmethod
     def aggregate(self, gradients: List[List[torch.Tensor]]) -> List[torch.Tensor]:
