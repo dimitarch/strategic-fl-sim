@@ -23,6 +23,8 @@ class Client(BaseClient):
         optimizer: torch.optim.Optimizer,
         action: Callable,
         local_steps: int = 1,
+        local_action_fn: Callable = None,
+        metrics_fn: Callable = None,
         agent_id: str = "client",
     ):
         """
@@ -37,18 +39,21 @@ class Client(BaseClient):
             optimizer: Parameter optimizer
             action: Strategic action function for gradient manipulation
             local_steps: Number of local optimizer steps per round (default: 1)
+            local_action: Strategic action function for gradient manipulation for each round in the local training
             agent_id: Client identifier (default: "client")
         """
         self.device = device
-        self.model = model
-        self.criterion = criterion
-        self.optimizer = optimizer
-        self.agent_id = agent_id
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
         self.train_iterator = iter(train_dataloader)
+        self.model = model
+        self.criterion = criterion
+        self.optimizer = optimizer
         self.action = action
         self.local_steps = local_steps
+        self.local_action = local_action_fn
+        self.metrics = metrics_fn
+        self.agent_id = agent_id
 
     @classmethod
     def create_clients(
@@ -61,6 +66,7 @@ class Client(BaseClient):
         optimizer_fn: Callable,
         action_fn: Callable,
         local_steps: int = 1,
+        local_action_fn: Callable = None,
         agent_ids: Optional[List[str]] = None,
     ) -> List["Client"]:
         """
@@ -94,6 +100,9 @@ class Client(BaseClient):
                 optimizer=optimizer,
                 action=action_fn(i),
                 local_steps=local_steps,
+                local_action_fn=local_action_fn(i)
+                if local_action_fn is not None
+                else None,
                 agent_id=agent_id,
             )
 
@@ -104,7 +113,15 @@ class Client(BaseClient):
 
     def apply_action(self, gradient):
         """Apply configured strategic action to gradient."""
+        if self.action(gradient) is None:
+            return gradient
         return self.action(gradient)
+
+    def apply_local_action(self, gradient):
+        """Apply per local time step strategic action to gradient."""
+        if self.local_action(gradient) is None:
+            return gradient
+        return self.local_action(gradient)
 
     def receive_global_model(self, trainable_state_dict: dict) -> None:
         """Update local model with trainable parameters from server."""
@@ -184,6 +201,11 @@ class Client(BaseClient):
 
         # Apply strategic action to each gradient
         sent_grad = [self.apply_action(g) for g in grad]
+
+        if self.metrics is not None:
+            self.metrics(
+                self, inputs, labels, loss.detach().cpu().item(), grad, sent_grad
+            )
 
         return sent_grad, loss.detach().cpu().item(), len(labels)
 
