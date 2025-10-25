@@ -1,20 +1,3 @@
-"""
-Action classes for strategic gradient manipulation in federated learning.
-
-All action classes follow a common interface:
-- Inherit from BaseAction
-- Implement __call__(gradient) -> modified_gradient
-- Can be composed and combined
-
-Example:
-    # Simple usage
-    action = ScalarAction(alpha=2.0, beta=0.1)
-    modified_grad = action(gradient)
-
-    # Use in client
-    client = Client(..., action=ScalarAction(alpha=2.0, beta=0.1))
-"""
-
 from abc import ABC, abstractmethod
 from typing import List
 
