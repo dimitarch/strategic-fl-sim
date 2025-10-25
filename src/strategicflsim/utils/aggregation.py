@@ -311,10 +311,7 @@ class WeightedGeometricMeanAggregator(BaseAggregator):
 
 class KrumAggregator(BaseAggregator):
     """
-    Krum aggregation: select single most representative gradient.
-
-    Selects the gradient with minimum sum of distances to its k nearest neighbors.
-    Provides Byzantine robustness by selecting a single trusted gradient.
+    Krum aggregation: select single most representative gradient. Selects the gradient with minimum sum of distances to its k nearest neighbors.
 
     Args:
         num_byzantine: Expected number of Byzantine clients (default: 0)
@@ -358,10 +355,7 @@ class KrumAggregator(BaseAggregator):
 
 class MultiKrumAggregator(BaseAggregator):
     """
-    Multi-Krum aggregation: average top-m most representative gradients.
-
-    Extension of Krum that averages multiple selected gradients instead of one.
-    Provides better utility while maintaining Byzantine robustness.
+    Multi-Krum aggregation: average top-m most representative gradients. Extension of Krum that averages multiple selected gradients instead of one.
 
     Args:
         num_byzantine: Expected number of Byzantine clients (default: 0)
@@ -418,10 +412,7 @@ class MultiKrumAggregator(BaseAggregator):
 
 class NormClippingAggregator(BaseAggregator):
     """
-    Gradient norm clipping aggregator.
-
-    Clips each gradient to maximum norm before aggregation.
-    Simple defense against large gradient attacks.
+    Gradient norm clipping aggregator. Clips each gradient to maximum norm before aggregation.
 
     Args:
         max_norm: Maximum allowed gradient norm (default: 10.0)
@@ -480,10 +471,7 @@ class NormClippingAggregator(BaseAggregator):
 
 class AdaptiveAggregator(BaseAggregator):
     """
-    Adaptive aggregation that switches methods based on gradient statistics.
-
-    Monitors cosine similarity variance to detect adversarial behavior.
-    Switches to robust aggregation when divergence detected.
+    Adaptive aggregation that switches methods based on gradient statistics.Monitors cosine similarity variance to detect adversarial behavior.
 
     Args:
         default_aggregator: Aggregator to use normally (default: MeanAggregator())
