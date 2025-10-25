@@ -255,7 +255,7 @@ class RelativeNormAction(BaseAction):
     """
     Scale gradient relative to honest gradient norm.
 
-    Makes attack adaptive to gradient magnitude (stealthier).
+    Makes attack adaptive to gradient magnitude.
 
     Args:
         relative_scale: Target norm as ratio of honest norm

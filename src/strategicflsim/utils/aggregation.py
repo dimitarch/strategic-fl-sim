@@ -55,9 +55,6 @@ class MeanAggregator(BaseAggregator):
     Computes element-wise average of all client gradients.
     Treats all clients equally regardless of dataset size.
 
-    Mathematical form:
-        mean(g₁, ..., gₙ) = (1/n) Σᵢ gᵢ
-
     Example:
         aggregator = MeanAggregator()
         # All clients weighted equally
@@ -85,11 +82,6 @@ class WeightedAverageAggregator(BaseAggregator):
 
     Weights each client's gradient proportionally to their dataset size.
     Falls back to equal weights if sizes not provided.
-
-    Mathematical form:
-        weighted_avg(g₁, ..., gₙ) = Σᵢ (nᵢ/Σⱼnⱼ) gᵢ
-
-    where nᵢ is the dataset size of client i.
 
     Example:
         aggregator = WeightedAverageAggregator()
@@ -138,11 +130,6 @@ class MedianAggregator(BaseAggregator):
     Computes median of each gradient coordinate across clients.
     Robust to outliers but ignores dataset sizes.
 
-    Mathematical form:
-        [median(g₁, ..., gₙ)]ₖ = median([g₁]ₖ, ..., [gₙ]ₖ)
-
-    where [·]ₖ denotes the k-th coordinate.
-
     Example:
         aggregator = MedianAggregator()
         # Robust to up to 50% Byzantine clients
@@ -170,10 +157,6 @@ class TrimmedMeanAggregator(BaseAggregator):
 
     Removes a fraction of extreme values before averaging.
     Provides robustness while being less aggressive than median.
-
-    Mathematical form:
-        For each coordinate, sort values, remove top/bottom trim_ratio fraction,
-        then average the remaining values.
 
     Args:
         trim_ratio: Fraction of clients to trim from each end (default: 0.1)
@@ -249,11 +232,6 @@ class GeometricMeanAggregator(BaseAggregator):
     Computes geometric mean while preserving sign information.
     More robust to outliers than arithmetic mean.
 
-    Mathematical form:
-        geom_mean(g₁, ..., gₙ) = sign(Σᵢ sign(gᵢ)) ⊙ exp((1/n) Σᵢ log|gᵢ|)
-
-    where ⊙ denotes element-wise multiplication.
-
     Example:
         aggregator = GeometricMeanAggregator()
         # Reduces impact of large gradient manipulations
@@ -288,11 +266,6 @@ class WeightedGeometricMeanAggregator(BaseAggregator):
     Weighted coordinate-wise geometric mean by dataset size.
 
     Combines geometric mean robustness with dataset size weighting.
-
-    Mathematical form:
-        weighted_geom_mean(g₁, ..., gₙ) = sign(Σᵢ wᵢ sign(gᵢ)) ⊙ exp(Σᵢ wᵢ log|gᵢ|)
-
-    where wᵢ = nᵢ/Σⱼnⱼ are normalized weights.
 
     Example:
         aggregator = WeightedGeometricMeanAggregator()
@@ -346,12 +319,6 @@ class KrumAggregator(BaseAggregator):
     Args:
         num_byzantine: Expected number of Byzantine clients (default: 0)
 
-    Mathematical form:
-        Let d(gᵢ, gⱼ) = ||gᵢ - gⱼ||₂. For each client i, compute:
-        score(i) = Σⱼ∈N(i) d(gᵢ, gⱼ)
-        where N(i) are the n-f-2 nearest neighbors of i.
-        Select i* = argmin score(i).
-
     Example:
         # Tolerate up to 2 Byzantine clients
         aggregator = KrumAggregator(num_byzantine=2)
@@ -400,11 +367,6 @@ class MultiKrumAggregator(BaseAggregator):
         num_byzantine: Expected number of Byzantine clients (default: 0)
         num_selected: Number of gradients to select and average
                      If None, uses n - num_byzantine (default: None)
-
-    Mathematical form:
-        1. Compute Krum scores for all clients (same as Krum)
-        2. Select m clients with lowest scores
-        3. Return average of selected gradients
 
     Example:
         # Select 5 best gradients, tolerate 2 Byzantine
