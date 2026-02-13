@@ -20,7 +20,6 @@ class Server(BaseServer):
         criterion: nn.Module,
         optimizer: torch.optim.Optimizer,
         aggregate_fn: Callable,
-        selector=None,
         agent_id: str = "server",
     ):
         """
@@ -32,7 +31,6 @@ class Server(BaseServer):
             criterion: Loss function
             optimizer: Optimizer
             aggregate_fn: Aggregation function
-            selector: Client selection strategy (default: AllSelector())
             agent_id: Server identifier
         """
         self.device = device
@@ -41,20 +39,14 @@ class Server(BaseServer):
         self.optimizer = optimizer
         self.aggregate_fn = aggregate_fn
 
-        if selector is None:
-            from strategicflsim.utils.selection import AllSelector
-
-            selector = AllSelector()
-        self.selector = selector
-
         self.agent_id = agent_id
 
     def train(
         self,
         clients: List[BaseClient],
         T: int = 1000,
-        client_fraction: float = 1.0,
-        metrics: Optional[Any] = None,
+        selector_fn=None,
+        metrics_fn: Optional[Any] = None,
     ) -> List[List[float]]:
         """
         Execute federated learning protocol.
@@ -62,20 +54,24 @@ class Server(BaseServer):
         Args:
             clients: List of client agents
             T: Number of training rounds
-            client_fraction: Fraction of clients to select (used by selector)
-            metrics: Optional metrics callback
+            selector_fn: Client selection strategy (default: AllSelector())
+            metrics_fn: Optional metrics_fn callback
 
         Returns:
             List of losses per round
         """
+        if selector_fn is None:
+            from strategicflsim.utils.selection import AllSelector
+
+            selector_fn = AllSelector()
+        self.selector_fn = selector_fn
+
         # Set server device for all clients, this is used to management ownership of gradients in single-node setup
         for client in clients:
             client.server_device = self.device
 
-        # losses_global = []
-
         for round_idx in tqdm(range(T), total=T, desc="Federated Training"):
-            selected_clients = self.selector.select(clients, fraction=client_fraction)
+            selected_clients = self.selector_fn.select(clients)
 
             self.broadcast_model(selected_clients)
 
@@ -84,8 +80,9 @@ class Server(BaseServer):
             client_num_samples = []
 
             for client in selected_clients:
-                gradient, loss, num_samples = client.local_train()
-                # Gradient on self.device
+                gradient, loss, num_samples = (
+                    client.local_train()
+                )  # Gradient on self.device
 
                 client_gradients.append(gradient)
                 client_num_samples.append(num_samples)
@@ -94,8 +91,8 @@ class Server(BaseServer):
             aggregated_gradient = self.aggregate(client_gradients, client_num_samples)
             self.update(aggregated_gradient)
 
-            if metrics is not None:
-                metrics(
+            if metrics_fn is not None:
+                metrics_fn(
                     round=round_idx,
                     server=self,
                     selected_clients=selected_clients,
@@ -105,37 +102,10 @@ class Server(BaseServer):
                     aggregated_gradient=aggregated_gradient,
                 )
 
-            # losses_global.append(round_losses)
+            # if torch.cuda.is_available():
+            #     torch.cuda.empty_cache()
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-        # return losses_global
-
-    # def select_clients(
-    #     self,
-    #     clients: List[BaseClient],
-    #     fraction: float = 1.0,
-    #     random_seed: Optional[int] = None,
-    # ) -> List[BaseClient]:
-    #     """
-    #     DEPRECATED: Use self.selector.select() instead.
-
-    #     Kept for backward compatibility.
-    #     """
-    #     import warnings
-
-    #     warnings.warn(
-    #         "Server.select_clients() is deprecated. Use selector.select() instead.",
-    #         DeprecationWarning,
-    #         stacklevel=2,
-    #     )
-
-    #     if random_seed is not None:
-    #         random.seed(random_seed)
-
-    #     n_selected = max(1, int(len(clients) * fraction))
-    #     return random.sample(clients, n_selected)
+        return
 
     def aggregate(
         self,

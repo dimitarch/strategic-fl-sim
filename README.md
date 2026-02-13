@@ -26,18 +26,18 @@ pip install -e .
 
 ```python
 from strategicflsim.agents import Client, Server
-from strategicflsim.utils.actions import create_scalar_action
-from strategicflsim.utils.aggregation import get_aggregate
+from strategicflsim.utils.actions import ScalarAction, SignFlippingAction
+from strategicflsim.utils.aggregation import MeanAggregation
 from strategicflsim.utils.evaluate import evaluate_with_ids
-from strategicflsim.utils.metrics import get_gradient_metrics
+from strategicflsim.utils.metrics import NormMetrics
 
 # Create server with robust aggregation
 server = Server(
     device=device,
-    model=CNN(),
+    model=Model(), # Generic PyTorch compatible model
     criterion=nn.CrossEntropyLoss(),
     optimizer=torch.optim.SGD(model.parameters(), lr=0.06),
-    aggregate=get_aggregate(method="mean")
+    aggregate=MeanAggregator # e.g. TrimmedMeanAggregator for a robust aggregator
 )
 
 # Create clients with strategic behavior
@@ -48,7 +48,7 @@ honest_client = Client(
     model=CNN(),
     criterion=nn.CrossEntropyLoss(),
     optimizer=torch.optim.SGD(model.parameters(), lr=0.06),
-    action=create_scalar_action(alpha=1.0, beta=0.0)  # Honest
+    action=ScalarAction(alpha=1.0, beta=0.0)  # Honest
 )
 
 adversarial_client = Client(
@@ -58,14 +58,15 @@ adversarial_client = Client(
     model=CNN(),
     criterion=nn.CrossEntropyLoss(),
     optimizer=torch.optim.SGD(model.parameters(), lr=0.06),
-    action=create_scalar_action(alpha=2.0, beta=0.1)  # Strategic
+    action=SignFlippingAction()  # Malicious
 )
 
 # Train the federated model
 losses, metrics = server.train(
     clients=clients,
     T=config.training.T,
-    get_metrics=get_gradient_metrics, # See below. Custom metrics function to extract per-step metrics; otherwise, memory usage is too high to store the entire history.
+    selector_fn=RandomSelection(fraction=0.5)
+    metrics_fn=NormMetrics(), # See below. Custom metrics hook to extract per-step metrics.
 )
 ```
 
@@ -113,29 +114,37 @@ We use a custom metrics function to extract gradient metrics at each training st
 ### Adding New Aggregation Methods
 
 ```python
-def custom_aggregate(gradients):
-    """Your custom aggregation logic."""
-    # Implementation here
-    return aggregated_gradients
+class CustomAggregator(ABC):
+    def __init__(self, params):
+        pass
+
+    def __call__(self, params) -> List[torch.Tensor]:
+        pass
 
 server = Server(
     # ...
-    aggregate=custom_aggregate
+    aggregate=CustomAggregator()
 )
 ```
 
 ### Adding New Client Strategies
 
 ```python
-def create_custom_action(*params):
-    def action(gradient):
-        # Your strategic behavior
-        return modified_gradient
-    return action
+class LossAwareScaling(BaseAction):
+    def __init__(self, threshold=1.0, scale=1.0):
+        self.threshold = threshold
+        self.scale = scale
+
+    def __call__(self, gradient, **kwargs):
+        client_state = kwargs.get(...)
+        # Scale if loss too high
+        if client_state.get('loss', 0) > self.threshold:
+            return self.scale * gradient
+        return gradient
 
 client = Client(
     # ...
-    action=create_custom_action(params)
+    action=LossAwareScaling()
 )
 ```
 
@@ -162,6 +171,7 @@ strategic-fl-sim/
 - tqdm
 - transformers (optional, for Twitter experiments)
 - matplotlib (optional, for notebook demos)
+
 
 ## Acknowledgements
 

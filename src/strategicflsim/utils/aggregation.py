@@ -153,10 +153,7 @@ class MedianAggregator(BaseAggregator):
 
 class TrimmedMeanAggregator(BaseAggregator):
     """
-    Trimmed mean aggregation.
-
-    Removes a fraction of extreme values before averaging.
-    Provides robustness while being less aggressive than median.
+    Trimmed mean aggregation. Removes a fraction of extreme values before averaging.
 
     Args:
         trim_ratio: Fraction of clients to trim from each end (default: 0.1)
@@ -183,44 +180,20 @@ class TrimmedMeanAggregator(BaseAggregator):
         """Compute trimmed mean of gradients."""
         num_clients = len(gradients)
         num_layers = len(gradients[0])
-
-        # Calculate how many clients to trim from each end
-        num_trim = max(1, int(num_clients * self.trim_ratio))
-
-        # Default to equal weights if sizes not provided
-        if num_samples is None:
-            num_samples = [1] * num_clients
-
-        total_size = sum(num_samples)
-        weights = [size / total_size for size in num_samples]
+        num_trim = min(
+            max(1, int(num_clients * self.trim_ratio)), (num_clients - 1) // 2
+        )
 
         aggregated = []
-
         for layer_idx in range(num_layers):
-            layer_grads = [grad[layer_idx] for grad in gradients]
+            layer_grads = torch.stack([grad[layer_idx] for grad in gradients])
 
-            # Flatten for easier trimming
-            flattened = torch.stack([g.flatten() for g in layer_grads])
-            original_shape = layer_grads[0].shape
+            # Sort along client dimension (dim=0)
+            sorted_grads, _ = torch.sort(layer_grads, dim=0)
 
-            # Weight each client's contribution
-            weighted_grads = torch.stack(
-                [weights[i] * flattened[i] for i in range(num_clients)]
-            )
-
-            # Sort along client dimension for each parameter
-            sorted_grads, _ = torch.sort(weighted_grads, dim=0)
-
-            # Trim extremes and compute mean
-            if num_clients > 2 * num_trim:
-                trimmed = sorted_grads[num_trim:-num_trim]
-                aggregated_flat = trimmed.mean(dim=0)
-            else:
-                # Not enough clients to trim, just use mean
-                aggregated_flat = weighted_grads.mean(dim=0)
-
-            # Reshape back to original
-            aggregated.append(aggregated_flat.reshape(original_shape))
+            # Trim and mean
+            trimmed = sorted_grads[num_trim:-num_trim]
+            aggregated.append(trimmed.mean(dim=0))
 
         return aggregated
 
@@ -305,6 +278,67 @@ class WeightedGeometricMeanAggregator(BaseAggregator):
             )
             final_sign = torch.sign(weighted_signs)
             aggregated.append(final_sign * geom_mean)
+
+        return aggregated
+
+
+class GeometricMedianAggregator(BaseAggregator):
+    """
+    Robust Federated Aggregation (RFA).
+
+    Uses smoothed Weiszfeld algorithm to compute approximate geometric median.
+    Robust to Byzantine attacks by finding the point minimizing sum of distances.
+
+    Args:
+        num_iterations: Number of Weiszfeld iterations (default: 5)
+        smoothing: Smoothing parameter to avoid division by zero (default: 1e-6)
+
+    Example:
+        aggregator = GeometricMedianAggregator(num_iterations=5)
+        aggregator = GeometricMedianAggregator(num_iterations=10, smoothing=1e-5)
+    """
+
+    def __init__(self, num_iterations: int = 5, smoothing: float = 1e-6):
+        if num_iterations <= 0:
+            raise ValueError("num_iterations must be positive")
+        if smoothing <= 0:
+            raise ValueError("smoothing must be positive")
+        self.num_iterations = num_iterations
+        self.smoothing = smoothing
+
+    def __call__(
+        self,
+        gradients: List[List[torch.Tensor]],
+        num_samples: Optional[List[int]] = None,
+    ) -> List[torch.Tensor]:
+        """Compute geometric median via smoothed Weiszfeld algorithm."""
+        num_clients = len(gradients)
+        num_layers = len(gradients[0])
+
+        # Equal weights for all clients
+        if num_samples is None:
+            weights = [1.0 / num_clients] * num_clients
+        else:
+            total = sum(num_samples)
+            weights = [n / total for n in num_samples]
+
+        aggregated = []
+
+        for layer_idx in range(num_layers):
+            layer_grads = [grad[layer_idx] for grad in gradients]
+            z = torch.zeros_like(layer_grads[0])
+
+            # Weiszfeld iterations
+            for _ in range(self.num_iterations):
+                betas = []
+                for grad, alpha in zip(layer_grads, weights):
+                    distance = torch.norm(z - grad)
+                    beta = alpha / max(distance.item(), self.smoothing)
+                    betas.append(beta)
+
+                z = sum(g * beta for g, beta in zip(layer_grads, betas)) / sum(betas)
+
+            aggregated.append(z)
 
         return aggregated
 
@@ -410,7 +444,7 @@ class MultiKrumAggregator(BaseAggregator):
         return MeanAggregator()(selected_gradients)
 
 
-class NormClippingAggregator(BaseAggregator):
+class CenteredClippingAggregator(BaseAggregator):
     """
     Gradient norm clipping aggregator. Clips each gradient to maximum norm before aggregation.
 
@@ -426,10 +460,10 @@ class NormClippingAggregator(BaseAggregator):
 
     Example:
         # Clip to norm 10, then average
-        aggregator = NormClippingAggregator(max_norm=10.0)
+        aggregator = CenteredClippingAggregator(max_norm=10.0)
 
         # Clip then use median
-        aggregator = NormClippingAggregator(
+        aggregator = CenteredClippingAggregator(
             max_norm=15.0,
             base_aggregator=MedianAggregator()
         )
@@ -467,6 +501,57 @@ class NormClippingAggregator(BaseAggregator):
 
         # Apply base aggregation to clipped gradients
         return self.base_aggregator(clipped_gradients, num_samples)
+
+
+class MeamedAggregator(BaseAggregator):
+    """
+    Mean around median aggregation.
+
+    For each coordinate, computes the median, then averages the n-f
+    vectors closest to that median. Robust to Byzantine attacks.
+
+    Args:
+        num_byzantine: Expected number of Byzantine clients (default: 0)
+
+    Example:
+        aggregator = MeamedAggregator(num_byzantine=2)
+    """
+
+    def __init__(self, num_byzantine: int = 0):
+        if num_byzantine < 0:
+            raise ValueError("num_byzantine must be non-negative")
+        self.num_byzantine = num_byzantine
+
+    def __call__(
+        self,
+        gradients: List[List[torch.Tensor]],
+        num_samples: Optional[List[int]] = None,
+    ) -> List[torch.Tensor]:
+        """Compute mean around median for each coordinate."""
+        num_clients = len(gradients)
+        num_layers = len(gradients[0])
+
+        if self.num_byzantine * 2 >= num_clients:
+            raise ValueError(
+                f"Cannot tolerate 2f ≥ n. Got f={self.num_byzantine}, n={num_clients}"
+            )
+
+        num_keep = num_clients - self.num_byzantine
+        aggregated = []
+
+        for layer_idx in range(num_layers):
+            layer_grads = torch.stack([grad[layer_idx] for grad in gradients])
+            median = torch.median(layer_grads, dim=0).values
+            abs_diff = torch.abs(layer_grads - median)
+
+            _, indices = torch.topk(
+                abs_diff, k=num_keep, dim=0, largest=False, sorted=False
+            )
+
+            selected = torch.gather(layer_grads, dim=0, index=indices)
+            aggregated.append(selected.mean(dim=0))
+
+        return aggregated
 
 
 class AdaptiveAggregator(BaseAggregator):
@@ -561,10 +646,10 @@ def get_aggregate(method: str = "mean", **kwargs) -> BaseAggregator:
         - "median": MedianAggregator
         - "trimmed_mean": TrimmedMeanAggregator(trim_ratio)
         - "geometric_mean": GeometricMeanAggregator
-        - "weighted_geometric_mean": WeightedGeometricMeanAggregator
+        - "geometric_median": GeometricMedianAggregator
         - "krum": KrumAggregator(num_byzantine)
         - "multi_krum": MultiKrumAggregator(num_byzantine, num_selected)
-        - "norm_clipping": NormClippingAggregator(max_norm)
+        - "centered_clipping": CenteredClippingAggregator(max_norm)
         - "adaptive": AdaptiveAggregator(threshold, window_size)
 
     Example:
@@ -583,6 +668,8 @@ def get_aggregate(method: str = "mean", **kwargs) -> BaseAggregator:
         return TrimmedMeanAggregator(trim_ratio=trim_ratio)
     elif method == "geometric_mean":
         return GeometricMeanAggregator()
+    elif method == "geometric_median":
+        return GeometricMedianAggregator()
     elif method == "weighted_geometric_mean":
         return WeightedGeometricMeanAggregator()
     elif method == "krum":
@@ -594,10 +681,10 @@ def get_aggregate(method: str = "mean", **kwargs) -> BaseAggregator:
         return MultiKrumAggregator(
             num_byzantine=num_byzantine, num_selected=num_selected
         )
-    elif method == "norm_clipping":
+    elif method == "centered_clipping":
         max_norm = kwargs.get("max_norm", 10.0)
         base = kwargs.get("base_aggregator", None)
-        return NormClippingAggregator(max_norm=max_norm, base_aggregator=base)
+        return CenteredClippingAggregator(max_norm=max_norm, base_aggregator=base)
     elif method == "adaptive":
         threshold = kwargs.get("threshold", 0.3)
         window_size = kwargs.get("window_size", 5)

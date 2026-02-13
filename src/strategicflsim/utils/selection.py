@@ -22,9 +22,7 @@ class BaseSelector(ABC):
     """
 
     @abstractmethod
-    def select(
-        self, clients: List[BaseClient], fraction: float = 1.0, **kwargs
-    ) -> List[BaseClient]:
+    def select(self, clients: List[BaseClient], **kwargs) -> List[BaseClient]:
         """
         Select subset of clients for training round.
 
@@ -45,7 +43,7 @@ class BaseSelector(ABC):
 
 class RandomSelector(BaseSelector):
     """
-    Uniform random sampling (standard FedAvg).
+    Uniform random sampling.
 
     Note:
         With small client counts, fraction is rounded up to ensure at least 1 client is selected
@@ -54,24 +52,23 @@ class RandomSelector(BaseSelector):
         seed: Random seed for reproducibility (default: None)
 
     Example:
-        selector = RandomSelector(seed=42)
-        selected = selector.select(clients, fraction=0.3)
+        selector = RandomSelector(seed=42, fraction=0.3)
+        selected = selector.select(clients)
     """
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(self, seed: Optional[int] = None, fraction: float = 1.0):
         self.seed = seed
         self._rng = random.Random(seed)
+        self.fraction = fraction
 
-    def select(
-        self, clients: List[BaseClient], fraction: float = 1.0, **kwargs
-    ) -> List[BaseClient]:
+    def select(self, clients: List[BaseClient], **kwargs) -> List[BaseClient]:
         """Uniformly sample clients at random."""
-        if not 0 < fraction <= 1.0:
-            raise ValueError(f"fraction must be in (0, 1], got {fraction}")
+        if not 0 < self.fraction <= 1.0:
+            raise ValueError(f"fraction must be in (0, 1], got {self.fraction}")
         if not clients:
             raise ValueError("clients list is empty")
 
-        n_selected = max(1, int(len(clients) * fraction))
+        n_selected = max(1, int(len(clients) * self.fraction))
         return self._rng.sample(clients, n_selected)
 
 
@@ -84,9 +81,7 @@ class AllSelector(BaseSelector):
         selected = selector.select(clients)  # Returns all clients
     """
 
-    def select(
-        self, clients: List[BaseClient], fraction: float = 1.0, **kwargs
-    ) -> List[BaseClient]:
+    def select(self, clients: List[BaseClient], **kwargs) -> List[BaseClient]:
         """Return all clients (ignores fraction)."""
         return clients
 
@@ -109,17 +104,12 @@ class RoundRobinSelector(BaseSelector):
         self.clients_per_round = clients_per_round
         self._offset = 0
 
-    def select(
-        self, clients: List[BaseClient], fraction: float = 1.0, **kwargs
-    ) -> List[BaseClient]:
+    def select(self, clients: List[BaseClient], **kwargs) -> List[BaseClient]:
         """Select next batch in round-robin order."""
         n_clients = len(clients)
         n_selected = min(self.clients_per_round, n_clients)
 
-        selected = []
-        for i in range(n_selected):
-            idx = (self._offset + i) % n_clients
-            selected.append(clients[idx])
+        selected = [clients[(self._offset + i) % n_clients] for i in range(n_selected)]
 
         self._offset = (self._offset + n_selected) % n_clients
         return selected

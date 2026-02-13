@@ -3,7 +3,6 @@ import json
 import os
 import pickle
 
-import numpy as np
 import torch
 import torch.distributed as dist
 from femnistdataloader import FEMNISTDataset
@@ -13,9 +12,9 @@ from torch.utils.data import DataLoader
 
 from models import CNN
 from strategicflsim.agents import DistributedClient, DistributedServer
-from strategicflsim.utils.actions import create_scalar_action
+from strategicflsim.utils.actions import ScalarAction
 from strategicflsim.utils.aggregation import get_aggregate
-from strategicflsim.utils.metrics import get_gradient_metrics
+from strategicflsim.utils.metrics import NormMetrics
 from utils.config import load_config, save_config
 from utils.io import generate_save_name, make_dir
 
@@ -87,7 +86,9 @@ def main():
             device=device,
             model=server_model,
             criterion=nn.CrossEntropyLoss().to(device),
-            optimizer=torch.optim.SGD(server_model.parameters(), lr=config.training.lr),
+            optimizer=torch.optim.SGD(
+                server_model.parameters(), lr=config.training.lr, foreach=True
+            ),
             aggregate_fn=get_aggregate(method=config.aggregation.method),
             agent_id="server",
         )
@@ -97,23 +98,25 @@ def main():
         num_clients = world_size - 1
         print(f"[Server] Starting training with {num_clients} distributed clients")
 
-        all_losses, all_metrics = server.train_distributed(
+        # Generate save name for metrics
+        save_name = generate_save_name(config)
+
+        # Create client IDs for metrics
+        client_ids = [f"good{i}" for i in range(num_clients - 1)] + ["bad"]
+
+        # Train with metrics collection
+        server.train_distributed(
             num_clients=num_clients,
             T=config.training.T,
-            get_metrics=get_gradient_metrics,
+            metrics=NormMetrics(
+                save_path=save_name,
+                client_ids=client_ids,
+            ),
         )
 
         print("\n[Server] Training complete!")
 
         # Save results
-        losses_array = np.array(
-            [[loss for loss in round_losses] for round_losses in all_losses]
-        )
-        grad_norms_array = np.array([metrics["grad_norms"] for metrics in all_metrics])
-        cosine_sims_array = np.array(
-            [metrics["cosine_similarities"] for metrics in all_metrics]
-        )
-
         results = {
             "config": OmegaConf.to_container(config, resolve=True),
             "n_players": num_clients,
@@ -123,14 +126,9 @@ def main():
             "beta_1": config.clients.beta_1,
             "T": config.training.T,
             "local_steps": config.training.get("local_steps", 1),
-            "train_gradsizes_per_step": grad_norms_array,
-            "train_cosine_per_step": cosine_sims_array,
-            "train_losses_per_step": losses_array,
             "distributed": True,
             "world_size": world_size,
         }
-
-        save_name = generate_save_name(config)
 
         with open(f"{save_name}_distributed.pkl", "wb") as f:
             pickle.dump(results, f)
@@ -138,6 +136,7 @@ def main():
         save_config(config, f"{save_name}_distributed")
 
         print(f"\n[Server] Results saved to: {save_name}_distributed.pkl")
+        print(f"[Server] Training metrics saved to CSV files with prefix: {save_name}")
 
     else:
         # ==================== CLIENT CODE ====================
@@ -166,10 +165,12 @@ def main():
             alpha = config.clients.alpha_1
             beta = config.clients.beta_1
             agent_id = "bad"
+            action = ScalarAction(alpha=alpha, beta=beta)
         else:
             alpha = config.clients.alpha_0
             beta = config.clients.beta_0
             agent_id = f"good{client_id}"
+            action = ScalarAction(alpha=alpha, beta=beta)
 
         # Create datasets
         train_dataset = FEMNISTDataset(client_user_names, data_dict)
@@ -204,8 +205,10 @@ def main():
             test_dataloader=test_dataloader,
             model=client_model,
             criterion=nn.CrossEntropyLoss().to(device),
-            optimizer=torch.optim.SGD(client_model.parameters(), lr=config.training.lr),
-            action=create_scalar_action(alpha, beta),
+            optimizer=torch.optim.SGD(
+                client_model.parameters(), lr=config.training.lr, foreach=True
+            ),
+            action=action,
             agent_id=agent_id,
             local_steps=config.training.get("local_steps", 1),
         )

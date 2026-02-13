@@ -89,19 +89,14 @@ class ScalarAction(BaseAction):
 
 class SignFlipAction(BaseAction):
     """
-    Flip the sign of the gradient (optionally with scaling).
-
-    Applies: modified_grad = -strength * gradient
+    Flip the sign of the gradient (optionally with scaling). Applies: modified_grad = - gradient
 
     Args:
         strength: Scaling factor (default: 1.0)
 
     Example:
         # Standard sign flip attack
-        action = SignFlipAction(strength=1.0)
-
-        # Amplified sign flip
-        action = SignFlipAction(strength=2.0)
+        action = SignFlipAction()
     """
 
     def __init__(self, strength: float = 1.0):
@@ -109,14 +104,12 @@ class SignFlipAction(BaseAction):
 
     def __call__(self, gradient: torch.Tensor) -> torch.Tensor:
         """Flip sign of gradient."""
-        return -self.strength * gradient
+        return (-1) * gradient
 
 
 class GradientAscentAction(BaseAction):
     """
     Gradient ascent attack - maximize loss instead of minimize.
-
-    Useful for studying poisoning impact on model convergence.
 
     Args:
         strength: How aggressively to maximize loss (default: 1.0)
@@ -127,10 +120,6 @@ class GradientAscentAction(BaseAction):
 
         # Partial ascent (stealthier)
         action = GradientAscentAction(strength=0.5)
-
-    Note:
-        This is equivalent to SignFlipAction but more semantically clear
-        for studying optimization dynamics.
     """
 
     def __init__(self, strength: float = 1.0):
